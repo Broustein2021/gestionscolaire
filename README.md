@@ -139,7 +139,7 @@ numérotation, échappement des apostrophes) sont documentées dans le script.
 
 Historique des mises en œuvre (du plus récent au plus ancien) :
 
-### Phase 2 — Inscriptions branchées sur les vraies données
+### Phase 2 — Inscriptions branchées sur les vraies données (`21367d1`)
 
 - `lib/queries/enrollments.ts` — **lectures** serveur : options d'inscription
   (année courante, classes avec effectifs réels, responsables disponibles, frais)
