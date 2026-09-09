@@ -6,11 +6,17 @@ import { Button } from '@/components/ui/button'
 import { ParentsList, ParentFormDialog } from '@/components/parents/parents-list'
 import { getParents } from '@/lib/queries/parents'
 import { getEleves } from '@/lib/queries/eleves'
+import { getCurrentSchoolContext } from '@/lib/queries/school-context'
 
 export const metadata = { title: 'Parents & Responsables — GESTION-SCOLAIRE' }
 
 export default async function ParentsPage() {
-  const [parents, eleves] = await Promise.all([getParents(), getEleves()])
+  const [parents, eleves, ctx] = await Promise.all([
+    getParents(),
+    getEleves(),
+    getCurrentSchoolContext(),
+  ])
+  const schoolId = ctx?.schoolId ?? null
 
   const elevesAvecResponsableIds = new Set(parents.flatMap((p) => p.enfants.map((e) => e.id)))
   const principaux = parents.filter((p) => p.principal).length
@@ -24,6 +30,7 @@ export default async function ParentsPage() {
         description="Responsables légaux, contacts et rattachement des enfants"
       >
         <ParentFormDialog
+          schoolId={schoolId}
           trigger={
             <Button>
               <Plus className="size-4" data-icon="inline-start" />
@@ -57,7 +64,7 @@ export default async function ParentsPage() {
         />
       </div>
 
-      <ParentsList parents={parents} />
+      <ParentsList parents={parents} schoolId={schoolId} />
     </>
   )
 }

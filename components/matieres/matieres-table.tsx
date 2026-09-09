@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Archive, BookOpen, Plus, Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { AlertTriangle, BookOpen, CheckCircle2, Loader2, Plus, Search } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,79 +35,193 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { creerMatiere, modifierMatiere } from '@/lib/matieres-create'
 import type { Matiere } from '@/lib/queries/matieres'
 
-function MatiereDialog({
+type EtatFormulaire = 'saisie' | 'envoi' | 'succes' | 'erreur'
+
+const CYCLES = ['Primaire', 'Collège', 'Lycée'] as const
+type Cycle = (typeof CYCLES)[number]
+
+export function MatiereDialog({
+  schoolId,
   matiere,
   trigger,
 }: {
+  schoolId: string | null
   matiere?: Matiere
   trigger: React.ReactNode
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [etat, setEtat] = useState<EtatFormulaire>('saisie')
+  const [message, setMessage] = useState('')
+
+  const [code, setCode] = useState('')
+  const [nom, setNom] = useState('')
+  const [coefficient, setCoefficient] = useState('1')
+  const [cycle, setCycle] = useState<Cycle>('Collège')
+
+  const edition = Boolean(matiere)
+
+  function reinitialiser() {
+    setCode(matiere?.code ?? '')
+    setNom(matiere?.nom ?? '')
+    setCoefficient(String(matiere?.coefficient ?? 1))
+    setCycle((matiere?.cycle as Cycle) ?? 'Collège')
+    setEtat('saisie')
+    setMessage('')
+  }
+
+  async function enregistrer() {
+    if (!schoolId) return
+    const coefficientValue = Number.parseFloat(coefficient || '1')
+    setEtat('envoi')
+    setMessage('')
+
+    const res = edition && matiere
+      ? await modifierMatiere(matiere.id, {
+          code,
+          nom,
+          coefficient: coefficientValue,
+          cycle,
+        })
+      : await creerMatiere({
+          schoolId,
+          code,
+          nom,
+          coefficient: coefficientValue,
+          cycle,
+        })
+
+    if (res.ok) {
+      setEtat('succes')
+      router.refresh()
+    } else {
+      setMessage(res.message)
+      setEtat('erreur')
+    }
+  }
+
+  const desactive = etat === 'envoi'
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        reinitialiser()
         setOpen(next)
-        if (!next) setSaved(false)
       }}
     >
       <DialogTrigger render={trigger as React.ReactElement} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{matiere ? `Matière — ${matiere.nom}` : 'Nouvelle matière'}</DialogTitle>
+          <DialogTitle>
+            {matiere ? `Matière — ${matiere.nom}` : 'Nouvelle matière'}
+          </DialogTitle>
           <DialogDescription>
-            {saved
-              ? 'Enregistré — la création réelle sera branchée au module Matières.'
-              : 'Code, libellé, coefficient et cycle concerné.'}
+            Code, libellé, coefficient et cycle concerné.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="m-code">Code</Label>
-            <Input id="m-code" defaultValue={matiere?.code} placeholder="MATH" />
+
+        {etat === 'succes' ? (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 py-6 text-center">
+            <CheckCircle2 className="size-10 text-primary" />
+            <p className="font-medium">{edition ? 'Matière modifiée' : 'Matière créée'}</p>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-mono">{code.toUpperCase()}</span> — {nom}
+            </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="m-coef">Coefficient</Label>
-            <Input
-              id="m-coef"
-              type="number"
-              min={1}
-              max={10}
-              defaultValue={matiere?.coefficient ?? 1}
-            />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="m-code">Code</Label>
+              <Input
+                id="m-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                disabled={desactive}
+                placeholder="MATH"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="m-coef">Coefficient</Label>
+              <Input
+                id="m-coef"
+                type="number"
+                min={0}
+                max={10}
+                step={0.5}
+                value={coefficient}
+                onChange={(e) => setCoefficient(e.target.value)}
+                disabled={desactive}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <Label htmlFor="m-nom">Libellé</Label>
+              <Input
+                id="m-nom"
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                disabled={desactive}
+                placeholder="Mathématiques"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <Label htmlFor="m-cycle">Cycle</Label>
+              <Select value={cycle} onValueChange={(v) => setCycle(v as Cycle)} disabled={desactive}>
+                <SelectTrigger id="m-cycle">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CYCLES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label htmlFor="m-nom">Libellé</Label>
-            <Input id="m-nom" defaultValue={matiere?.nom} placeholder="Mathématiques" />
+        )}
+
+        {etat === 'erreur' ? (
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>{message}</span>
           </div>
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label htmlFor="m-cycle">Cycle</Label>
-            <Select defaultValue={matiere?.cycle ?? 'Collège'}>
-              <SelectTrigger id="m-cycle">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Primaire">Primaire</SelectItem>
-                <SelectItem value="Collège">Collège</SelectItem>
-                <SelectItem value="Lycée">Lycée</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        ) : null}
+
         <DialogFooter>
-          {matiere ? (
-            <Button variant="outline">
-              <Archive className="size-4" data-icon="inline-start" />
-              Archiver
+          {etat === 'succes' ? (
+            <Button
+              onClick={() => {
+                setOpen(false)
+                reinitialiser()
+              }}
+            >
+              Terminé
             </Button>
-          ) : null}
-          <Button onClick={() => setSaved(true)} disabled={saved}>
-            {saved ? 'Enregistré' : 'Enregistrer'}
-          </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={desactive}>
+                Annuler
+              </Button>
+              <Button
+                onClick={enregistrer}
+                disabled={desactive || !schoolId || !code.trim() || !nom.trim()}
+              >
+                {desactive ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
+                    Enregistrement…
+                  </>
+                ) : (
+                  'Enregistrer'
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -116,9 +231,11 @@ function MatiereDialog({
 export function MatieresTable({
   matieres,
   cycles,
+  schoolId,
 }: {
   matieres: Matiere[]
   cycles: readonly string[]
+  schoolId: string | null
 }) {
   const [q, setQ] = useState('')
   const [cycle, setCycle] = useState('tous')
@@ -170,6 +287,7 @@ export function MatieresTable({
               description="Créez votre première matière pour organiser les évaluations."
             >
               <MatiereDialog
+                schoolId={schoolId}
                 trigger={
                   <Button>
                     <Plus className="size-4" data-icon="inline-start" />
@@ -224,6 +342,7 @@ export function MatieresTable({
                     </TableCell>
                     <TableCell>
                       <MatiereDialog
+                        schoolId={schoolId}
                         matiere={m}
                         trigger={
                           <Button variant="ghost" size="sm">
@@ -242,5 +361,3 @@ export function MatieresTable({
     </Card>
   )
 }
-
-export { MatiereDialog }

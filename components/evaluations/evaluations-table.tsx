@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ClipboardList, Plus, Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { CheckCircle2, ClipboardList, Loader2, Plus, Search } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,51 +36,107 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import {
-  classes,
-  enseignants,
-  evaluations,
-  getClasse,
-  getEnseignant,
-  getMatiere,
-  matieres,
-  statutEvaluationLabel,
-  trimestres,
-  typesEvaluation,
-  type Evaluation,
-} from '@/lib/data'
+import { statutEvaluationLabel, typesEvaluation } from '@/lib/grades-meta'
+import type { StatutEvaluation } from '@/lib/grades-meta'
+import { creerEvaluation } from '@/lib/grades-write'
+import type { Evaluation, EvaluationOptions } from '@/lib/queries/grades'
 
-const statutStyles: Record<Evaluation['statut'], string> = {
+const statutStyles: Record<StatutEvaluation, string> = {
   planifiee: 'bg-chart-2/15 text-chart-2',
   saisie: 'bg-chart-3/15 text-chart-3',
   validee: 'bg-primary/10 text-primary',
+  annulee: 'bg-muted text-muted-foreground',
 }
 
-export function StatutEvaluationBadge({
-  statut,
-}: {
-  statut: Evaluation['statut']
-}) {
+export function StatutEvaluationBadge({ statut }: { statut: StatutEvaluation }) {
   return (
-    <Badge
-      variant="secondary"
-      className={cn('border-transparent', statutStyles[statut])}
-    >
+    <Badge variant="secondary" className={cn('border-transparent', statutStyles[statut])}>
       {statutEvaluationLabel[statut]}
     </Badge>
   )
 }
 
-export function EvaluationDialog({ trigger }: { trigger: React.ReactNode }) {
+export function EvaluationDialog({
+  trigger,
+  options,
+}: {
+  trigger: React.ReactNode
+  options: EvaluationOptions | null
+}) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [envoi, setEnvoi] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [erreur, setErreur] = useState<string | null>(null)
+
+  const [libelle, setLibelle] = useState('')
+  const [type, setType] = useState<string>(typesEvaluation[2])
+  const [termId, setTermId] = useState<string>('')
+  const [classeId, setClasseId] = useState<string>('')
+  const [matiereId, setMatiereId] = useState<string>('')
+  const [enseignantId, setEnseignantId] = useState<string>('')
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [bareme, setBareme] = useState('20')
+  const [coef, setCoef] = useState('2')
+
+  const types = [...typesEvaluation]
+  const classes = options?.classes ?? []
+  const matieres = options?.matieres ?? []
+  const enseignants = options?.enseignants ?? []
+  const termes = options?.termes ?? []
+
+  function reinitialiser() {
+    setLibelle('')
+    setType(typesEvaluation[2])
+    setTermId(termes[0]?.id ?? '')
+    setClasseId(classes[0]?.id ?? '')
+    setMatiereId(matieres[0]?.id ?? '')
+    setEnseignantId(enseignants[0]?.id ?? '')
+    setDate(new Date().toISOString().slice(0, 10))
+    setBareme('20')
+    setCoef('2')
+    setErreur(null)
+    setSaved(false)
+  }
+
+  async function creer() {
+    if (!options) return
+    setEnvoi(true)
+    setErreur(null)
+    const resultat = await creerEvaluation({
+      schoolId: options.schoolId,
+      academicYearId: options.academicYearId,
+      termId,
+      classId: classeId,
+      subjectId: matiereId,
+      teacherId: enseignantId || null,
+      title: libelle,
+      type,
+      date,
+      bareme: Number(bareme) || 20,
+      coefficient: Number(coef) || 1,
+    })
+    if (resultat.ok) {
+      setSaved(true)
+      router.refresh()
+    } else {
+      setErreur(resultat.message)
+    }
+    setEnvoi(false)
+  }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (!next) setSaved(false)
+        if (next && options && !termId) {
+          setTermId(termes[0]?.id ?? '')
+          setClasseId(classes[0]?.id ?? '')
+          setMatiereId(matieres[0]?.id ?? '')
+          setEnseignantId(enseignants[0]?.id ?? '')
+        }
+        if (!next) reinitialiser()
       }}
     >
       <DialogTrigger render={trigger as React.ReactElement} />
@@ -88,149 +145,190 @@ export function EvaluationDialog({ trigger }: { trigger: React.ReactNode }) {
           <DialogTitle>Nouvelle évaluation</DialogTitle>
           <DialogDescription>
             {saved
-              ? 'Évaluation créée en mode maquette — les données ne sont pas encore persistées.'
+              ? 'Évaluation planifiée et enregistrée.'
               : 'Planifiez un devoir, une interrogation ou une composition.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label htmlFor="ev-libelle">Libellé</Label>
-            <Input
-              id="ev-libelle"
-              placeholder="Composition N°1 — Mathématiques"
-            />
+
+        {saved ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <CheckCircle2 className="size-10 text-primary" />
+            <p className="text-sm text-muted-foreground">
+              {libelle || 'L’évaluation'} a été créée avec le statut « Planifiée ».
+              Vous pouvez saisir les notes depuis le module Notes.
+            </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-type">Type</Label>
-            <Select defaultValue={typesEvaluation[2]}>
-              <SelectTrigger id="ev-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {typesEvaluation.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <Label htmlFor="ev-libelle">Libellé</Label>
+              <Input
+                id="ev-libelle"
+                placeholder="Composition N°1 — Mathématiques"
+                value={libelle}
+                onChange={(e) => setLibelle(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-type">Type</Label>
+              <Select value={type} onValueChange={(v) => setType((v as string) ?? types[0])}>
+                <SelectTrigger id="ev-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-periode">Période</Label>
+              <Select value={termId} onValueChange={(v) => setTermId((v as string) ?? '')}>
+                <SelectTrigger id="ev-periode">
+                  <SelectValue placeholder="Choisir" />
+                </SelectTrigger>
+                <SelectContent>
+                  {termes.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label}
+                      {t.estCourant ? ' (en cours)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-classe">Classe</Label>
+              <Select value={classeId} onValueChange={(v) => setClasseId((v as string) ?? '')}>
+                <SelectTrigger id="ev-classe">
+                  <SelectValue placeholder="Choisir" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-matiere">Matière</Label>
+              <Select value={matiereId} onValueChange={(v) => setMatiereId((v as string) ?? '')}>
+                <SelectTrigger id="ev-matiere">
+                  <SelectValue placeholder="Choisir" />
+                </SelectTrigger>
+                <SelectContent>
+                  {matieres.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-ens">Enseignant</Label>
+              <Select value={enseignantId} onValueChange={(v) => setEnseignantId((v as string) ?? '')}>
+                <SelectTrigger id="ev-ens">
+                  <SelectValue placeholder="Choisir" />
+                </SelectTrigger>
+                <SelectContent>
+                  {enseignants.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.prenoms} {t.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-date">Date</Label>
+              <Input id="ev-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-bareme">Barème (sur 20 par défaut)</Label>
+              <Input
+                id="ev-bareme"
+                type="number"
+                min={1}
+                value={bareme}
+                onChange={(e) => setBareme(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ev-coef">Coefficient</Label>
+              <Input
+                id="ev-coef"
+                type="number"
+                min={1}
+                max={10}
+                value={coef}
+                onChange={(e) => setCoef(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-periode">Période</Label>
-            <Select defaultValue={trimestres[0]}>
-              <SelectTrigger id="ev-periode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {trimestres.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-classe">Classe</Label>
-            <Select defaultValue={classes[3].id}>
-              <SelectTrigger id="ev-classe">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-matiere">Matière</Label>
-            <Select defaultValue={matieres[0].id}>
-              <SelectTrigger id="ev-matiere">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {matieres.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-ens">Enseignant</Label>
-            <Select defaultValue={enseignants[0].id}>
-              <SelectTrigger id="ev-ens">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {enseignants.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.prenoms} {t.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-date">Date</Label>
-            <Input
-              id="ev-date"
-              type="date"
-              defaultValue={new Date().toISOString().slice(0, 10)}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-bareme">Barème</Label>
-            <Input id="ev-bareme" type="number" min={1} defaultValue={20} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ev-coef">Coefficient</Label>
-            <Input
-              id="ev-coef"
-              type="number"
-              min={1}
-              max={10}
-              defaultValue={2}
-            />
-          </div>
-        </div>
+        )}
+
+        {erreur ? (
+          <p className="rounded-lg border border-destructive bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {erreur}
+          </p>
+        ) : null}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Annuler
-          </Button>
-          <Button onClick={() => setSaved(true)} disabled={saved}>
-            {saved ? 'Créée' : 'Créer l’évaluation'}
-          </Button>
+          {saved ? (
+            <Button onClick={() => setOpen(false)}>Fermer</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Annuler
+              </Button>
+              <Button
+                onClick={creer}
+                disabled={envoi || !options || !libelle.trim() || !termId || !classeId || !matiereId}
+              >
+                {envoi ? <Loader2 className="size-4 animate-spin" data-icon="inline-start" /> : null}
+                {envoi ? 'Création…' : 'Créer l’évaluation'}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-export function EvaluationsTable() {
+export function EvaluationsTable({
+  evaluations,
+  options,
+}: {
+  evaluations: Evaluation[]
+  options: EvaluationOptions | null
+}) {
   const [q, setQ] = useState('')
   const [classeId, setClasseId] = useState('toutes')
   const [statut, setStatut] = useState('tous')
+
+  const classes = options?.classes ?? []
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
     return evaluations
       .filter((ev) => {
-        const matiere = getMatiere(ev.matiereId)
         const matchTerm =
           !term ||
           ev.libelle.toLowerCase().includes(term) ||
-          (matiere?.nom.toLowerCase().includes(term) ?? false)
+          (ev.matiereNom?.toLowerCase().includes(term) ?? false)
         const matchClasse = classeId === 'toutes' || ev.classeId === classeId
         const matchStatut = statut === 'tous' || ev.statut === statut
         return matchTerm && matchClasse && matchStatut
       })
-      .sort((a, b) => b.date.localeCompare(a.date))
-  }, [q, classeId, statut])
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+  }, [q, classeId, statut, evaluations])
 
   return (
     <Card>
@@ -265,9 +363,11 @@ export function EvaluationsTable() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="tous">Tous les statuts</SelectItem>
-              <SelectItem value="planifiee">Planifiée</SelectItem>
-              <SelectItem value="saisie">Saisie</SelectItem>
-              <SelectItem value="validee">Validée</SelectItem>
+              {(['planifiee', 'saisie', 'validee', 'annulee'] as const).map((s) => (
+                <SelectItem key={s} value={s}>
+                  {statutEvaluationLabel[s]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -280,8 +380,9 @@ export function EvaluationsTable() {
               description="Planifiez une première évaluation pour cette période."
             >
               <EvaluationDialog
+                options={options}
                 trigger={
-                  <Button>
+                  <Button disabled={!options}>
                     <Plus className="size-4" data-icon="inline-start" />
                     Créer une évaluation
                   </Button>
@@ -306,61 +407,51 @@ export function EvaluationsTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((ev) => {
-                  const enseignant = getEnseignant(ev.enseignantId)
-                  return (
-                    <TableRow key={ev.id}>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium leading-tight">
-                            {ev.libelle}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {ev.type} — {ev.periode}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                {filtered.map((ev) => (
+                  <TableRow key={ev.id}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium leading-tight">{ev.libelle}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {ev.type} — {ev.periode ?? 'Période non définie'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {ev.classeId ? (
                         <Link href={`/classes/${ev.classeId}`}>
-                          <Badge
-                            variant="outline"
-                            className="transition-colors hover:bg-accent"
-                          >
-                            {getClasse(ev.classeId)?.nom}
+                          <Badge variant="outline" className="transition-colors hover:bg-accent">
+                            {ev.classeNom}
                           </Badge>
                         </Link>
-                      </TableCell>
-                      <TableCell>{getMatiere(ev.matiereId)?.nom}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {enseignant
-                          ? `${enseignant.prenoms} ${enseignant.nom}`
-                          : '—'}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {new Date(ev.date).toLocaleDateString('fr-FR')}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        /{ev.bareme}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {ev.coefficient}
-                      </TableCell>
-                      <TableCell>
-                        <StatutEvaluationBadge statut={ev.statut} />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          nativeButton={false}
-                          render={<Link href={`/notes?evaluation=${ev.id}`} />}
-                        >
-                          Notes
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{ev.matiereNom ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {ev.enseignantNom ?? '—'}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {ev.date ? new Date(ev.date).toLocaleDateString('fr-FR') : '—'}
+                    </TableCell>
+                    <TableCell className="text-center tabular-nums">/{ev.bareme}</TableCell>
+                    <TableCell className="text-center tabular-nums">{ev.coefficient}</TableCell>
+                    <TableCell>
+                      <StatutEvaluationBadge statut={ev.statut} />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link href={`/notes?evaluation=${ev.id}`} />}
+                      >
+                        Notes
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -369,4 +460,3 @@ export function EvaluationsTable() {
     </Card>
   )
 }
-

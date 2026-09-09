@@ -37,14 +37,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  alertes,
-  etablissement,
-  formatFCFA,
-  getEleve,
-  kpis,
-  paiements,
-} from '@/lib/data'
+import { formatFCFA } from '@/lib/data'
+import type { Alerte } from '@/lib/queries/dashboard'
+import { getDashboard } from '@/lib/queries/dashboard'
 
 const quickActions = [
   { label: 'Inscrire un élève', href: '/inscriptions', icon: UserPlus },
@@ -53,19 +48,22 @@ const quickActions = [
   { label: 'Générer un bulletin', href: '/bulletins', icon: FileText },
 ]
 
-const alerteStyles: Record<string, string> = {
+const alerteStyles: Record<Alerte['severite'], string> = {
   haute: 'text-destructive bg-destructive/10',
   moyenne: 'text-chart-3 bg-chart-3/15',
   basse: 'text-chart-2 bg-chart-2/15',
   info: 'text-muted-foreground bg-muted',
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const data = await getDashboard()
+  const { kpis } = data
+
   return (
     <>
       <PageHeader
         title="Tableau de bord"
-        description={`${etablissement.anneeScolaire} — ${etablissement.periodeCourante}`}
+        description={`${data.etablissement.anneeScolaire || 'Année en cours'} — ${data.etablissement.nom}`}
       >
         <LinkButton href="/finances" variant="outline">
           <Wallet className="size-4" data-icon="inline-start" />
@@ -92,7 +90,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Situation financière</CardTitle>
             <CardDescription>
-              Année {etablissement.anneeScolaire}
+              Année {data.etablissement.anneeScolaire}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
@@ -121,7 +119,7 @@ export default function DashboardPage() {
               <Progress value={kpis.tauxRecouvrement} />
             </div>
             <Separator />
-            <FinanceChart />
+            <FinanceChart data={data.encaissementsMensuels} />
           </CardContent>
         </Card>
 
@@ -131,7 +129,7 @@ export default function DashboardPage() {
             <CardDescription>Par cycle d&apos;enseignement</CardDescription>
           </CardHeader>
           <CardContent>
-            <CycleChart />
+            <CycleChart data={data.repartitionCycle} />
           </CardContent>
         </Card>
       </section>
@@ -147,22 +145,28 @@ export default function DashboardPage() {
             <CardDescription>Éléments qui requièrent votre attention</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            {alertes.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center gap-3 rounded-lg border bg-card p-3"
-              >
-                <span
-                  className={`flex size-8 shrink-0 items-center justify-center rounded-md ${alerteStyles[a.severite]}`}
+            {data.alertes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucune alerte en cours — tout est à jour.
+              </p>
+            ) : (
+              data.alertes.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-3 rounded-lg border bg-card p-3"
                 >
-                  <Info className="size-4" />
-                </span>
-                <span className="text-sm">{a.message}</span>
-                <Badge variant="outline" className="ml-auto capitalize">
-                  {a.type.replace('_', ' ')}
-                </Badge>
-              </div>
-            ))}
+                  <span
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-md ${alerteStyles[a.severite]}`}
+                  >
+                    <Info className="size-4" />
+                  </span>
+                  <span className="text-sm">{a.message}</span>
+                  <Badge variant="outline" className="ml-auto capitalize">
+                    {a.type.replace('_', ' ')}
+                  </Badge>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -213,25 +217,28 @@ export default function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paiements.slice(0, 5).map((p) => {
-                const eleve = getEleve(p.eleveId)
-                return (
+              {data.derniersPaiements.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    Aucun paiement enregistré pour l&apos;instant.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.derniersPaiements.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-mono text-xs">{p.recu}</TableCell>
-                    <TableCell className="font-medium">
-                      {eleve ? `${eleve.prenoms} ${eleve.nom}` : '—'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{p.motif}</TableCell>
+                    <TableCell className="font-mono text-xs">{p.recu ?? '—'}</TableCell>
+                    <TableCell className="font-medium">{p.eleve ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{p.motif ?? '—'}</TableCell>
                     <TableCell>{p.mode}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
                       {formatFCFA(p.montant)}
                     </TableCell>
                     <TableCell>
-                      {eleve ? <PaymentBadge statut={eleve.statutPaiement} /> : null}
+                      <PaymentBadge statut={p.statutPaiement} />
                     </TableCell>
                   </TableRow>
-                )
-              })}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

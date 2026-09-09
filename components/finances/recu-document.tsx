@@ -1,23 +1,25 @@
 import { GraduationCap } from 'lucide-react'
 
-import { etablissement, formatFCFA, getClasse, getEleve } from '@/lib/data'
+import { formatFCFA } from '@/lib/data'
+import type { EtablissementInfo } from '@/lib/queries/finances'
 
 export type RecuData = {
-  recu: string
-  eleveId: string
+  numeroRecu: string
+  eleveNom: string
+  matricule: string
+  classeNom: string | null
   montant: number
   date: string
   mode: string
-  motif: string
-  reference: string
-  enregistrePar: string
+  motif: string | null
+  reference: string | null
+  enregistrePar: string | null
   soldeRestant: number
+  anneeScolaire: string
+  etablissement: EtablissementInfo
 }
 
 export function RecuDocument({ data }: { data: RecuData }) {
-  const eleve = getEleve(data.eleveId)
-  const classe = eleve ? getClasse(eleve.classeId) : undefined
-
   return (
     <div
       data-print-area
@@ -30,20 +32,24 @@ export function RecuDocument({ data }: { data: RecuData }) {
           </div>
           <div className="flex flex-col gap-0.5">
             <p className="text-sm font-semibold uppercase tracking-wide">
-              {etablissement.organisation}
+              {data.etablissement.organisation || 'Établissement scolaire'}
             </p>
-            <p className="text-sm text-muted-foreground">{etablissement.nom}</p>
+            <p className="text-sm text-muted-foreground">{data.etablissement.nom}</p>
             <p className="text-xs text-muted-foreground">
-              {etablissement.commune}, {etablissement.ville} ·{' '}
-              {etablissement.telephone}
+              {[data.etablissement.commune, data.etablissement.ville]
+                .filter(Boolean)
+                .join(', ') || '—'}{' '}
+              {data.etablissement.telephone
+                ? `· ${data.etablissement.telephone}`
+                : ''}
             </p>
           </div>
         </div>
         <div className="flex flex-col gap-0.5 sm:text-right">
           <p className="font-serif text-lg font-semibold">Reçu de paiement</p>
-          <p className="font-mono text-sm">{data.recu}</p>
+          <p className="font-mono text-sm">{data.numeroRecu}</p>
           <p className="text-xs text-muted-foreground">
-            {etablissement.periodeCourante} — {etablissement.anneeScolaire}
+            Année scolaire {data.anneeScolaire}
           </p>
         </div>
       </header>
@@ -51,17 +57,15 @@ export function RecuDocument({ data }: { data: RecuData }) {
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">Élève</dt>
-          <dd className="font-medium">
-            {eleve ? `${eleve.nom} ${eleve.prenoms}` : '—'}
-          </dd>
+          <dd className="font-medium">{data.eleveNom || '—'}</dd>
         </div>
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">Matricule</dt>
-          <dd className="font-mono">{eleve?.matricule ?? '—'}</dd>
+          <dd className="font-mono">{data.matricule || '—'}</dd>
         </div>
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">Classe</dt>
-          <dd className="font-medium">{classe?.nom ?? '—'}</dd>
+          <dd className="font-medium">{data.classeNom ?? '—'}</dd>
         </div>
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">Date</dt>
@@ -89,7 +93,7 @@ export function RecuDocument({ data }: { data: RecuData }) {
           </thead>
           <tbody>
             <tr className="border-t">
-              <td className="px-3 py-2 font-medium">{data.motif}</td>
+              <td className="px-3 py-2 font-medium">{data.motif ?? '—'}</td>
               <td className="px-3 py-2">{data.mode}</td>
               <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
                 {data.reference || '—'}
@@ -121,7 +125,7 @@ export function RecuDocument({ data }: { data: RecuData }) {
         </div>
         <div className="flex flex-col gap-0.5 rounded-lg border p-3">
           <span className="text-xs text-muted-foreground">Enregistré par</span>
-          <span className="text-sm font-medium">{data.enregistrePar}</span>
+          <span className="text-sm font-medium">{data.enregistrePar ?? '—'}</span>
         </div>
       </div>
 

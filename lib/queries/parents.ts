@@ -16,6 +16,7 @@ export type Parent = {
   profession: string | null
   telephone: string | null
   email: string | null
+  adresse: string | null
   principal: boolean
   enfants: ParentEnfant[]
 }
@@ -33,7 +34,7 @@ export async function getParents(): Promise<Parent[]> {
 
   const { data: guardianRows, error } = await supabase
     .from('guardians')
-    .select('id, first_name, last_name, phone, email, profession')
+    .select('id, first_name, last_name, phone, email, profession, address')
     .eq('school_id', ctx.schoolId)
     .order('last_name', { ascending: true })
 
@@ -100,6 +101,7 @@ export async function getParents(): Promise<Parent[]> {
     profession: g.profession,
     telephone: g.phone,
     email: g.email,
+    adresse: g.address,
     principal: principalParGuardian.get(g.id) ?? false,
     enfants: enfantsParGuardian.get(g.id) ?? [],
   }))

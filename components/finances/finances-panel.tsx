@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import {
   CircleDollarSign,
@@ -42,37 +43,18 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { PaymentBadge } from '@/components/payment-badge'
 import { StatCard } from '@/components/stat-card'
-import {
-  PaiementForm,
-  type NouveauPaiement,
-} from '@/components/finances/paiement-form'
-import {
-  RecuDocument,
-  type RecuData,
-} from '@/components/finances/recu-document'
-import {
-  formatFCFA,
-  getClasse,
-  getEleve,
-  kpis,
-  modesPaiement,
-  paiements as paiementsInitiaux,
-  type Paiement,
-  type StatutPaiement,
-} from '@/lib/data'
-
-function statutDepuisMontants(du: number, paye: number): StatutPaiement {
-  if (paye >= du) return 'a_jour'
-  if (du > 0 && paye / du >= 0.5) return 'partiel'
-  return 'retard'
-}
+import { PaiementForm } from '@/components/finances/paiement-form'
+import { RecuDocument, type RecuData } from '@/components/finances/recu-document'
+import { formatFCFA, modesPaiement } from '@/lib/data'
+import type { PaiementEnregistre } from '@/lib/payments-create'
+import type { FinancesData, FinancesOptions } from '@/lib/queries/finances'
 
 /** Montant sans suffixe — le libellé de la carte porte déjà « FCFA ». */
 function montantCourt(valeur: number) {
   return new Intl.NumberFormat('fr-FR').format(valeur)
 }
 
-const FILTRES_STATUT: Record<string, StatutPaiement | 'tous'> = {
+const FILTRES_STATUT: Record<string, 'a_jour' | 'partiel' | 'retard' | 'tous'> = {
   'Tout statut': 'tous',
   'À jour': 'a_jour',
   Partiel: 'partiel',
@@ -90,58 +72,33 @@ function joursDepuis(date: string) {
   return diff / 86_400_000
 }
 
-function numeroRecu(total: number) {
-  const base = paiementsInitiaux
-    .map((p) => Number(p.recu.split('-').pop()))
-    .sort((a, b) => b - a)[0]
-  return `REC-2526-${String((base ?? 0) + total + 1).padStart(4, '0')}`
+type Props = {
+  data: FinancesData | null
+  options: FinancesOptions | null
 }
 
-export function FinancesPanel() {
-  const [nouveaux, setNouveaux] = useState<Paiement[]>([])
+export function FinancesPanel({ data, options }: Props) {
+  const router = useRouter()
   const [formOpen, setFormOpen] = useState(false)
-  const [recu, setRecu] = useState<RecuData | null>(null)
+  const [recuData, setRecuData] = useState<RecuData | null>(null)
 
   const [q, setQ] = useState('')
   const [statut, setStatut] = useState('Tout statut')
   const [mode, setMode] = useState('Tout mode')
   const [periode, setPeriode] = useState('Toute période')
 
-  const extras = useMemo(() => {
-    const acc: Record<string, number> = {}
-    for (const p of nouveaux) {
-      acc[p.eleveId] = (acc[p.eleveId] ?? 0) + p.montant
-    }
-    return acc
-  }, [nouveaux])
-
-  const encaisseSession = nouveaux.reduce((s, p) => s + p.montant, 0)
-  const montantEncaisse = kpis.montantEncaisse + encaisseSession
-  const resteRecouvrer = Math.max(0, kpis.montantAttendu - montantEncaisse)
-  const taux = Math.round((montantEncaisse / kpis.montantAttendu) * 100)
+  const kpis = data?.kpis
+  const paiements = data?.paiements ?? []
 
   const lignes = useMemo(() => {
     const term = q.trim().toLowerCase()
-    return [...nouveaux, ...paiementsInitiaux]
-      .map((p) => {
-        const eleve = getEleve(p.eleveId)
-        const paye = (eleve?.montantPaye ?? 0) + (extras[p.eleveId] ?? 0)
-        return {
-          ...p,
-          eleve,
-          statut: eleve
-            ? statutDepuisMontants(eleve.montantDu, paye)
-            : ('retard' as StatutPaiement),
-          soldeRestant: Math.max(0, (eleve?.montantDu ?? 0) - paye),
-        }
-      })
+    return paiements
       .filter((l) => {
-        const nom = l.eleve ? `${l.eleve.prenoms} ${l.eleve.nom}` : ''
+        const nom = `${l.eleveNom ?? ''} ${l.matricule ?? ''}`.toLowerCase()
         const matchTerm =
           !term ||
-          nom.toLowerCase().includes(term) ||
-          l.recu.toLowerCase().includes(term) ||
-          (l.eleve?.matricule ?? '').toLowerCase().includes(term)
+          nom.includes(term) ||
+          (l.recu ?? '').toLowerCase().includes(term)
         const statutCible = FILTRES_STATUT[statut] ?? 'tous'
         const matchStatut = statutCible === 'tous' || l.statut === statutCible
         const matchMode = mode === 'Tout mode' || l.mode === mode
@@ -151,76 +108,100 @@ export function FinancesPanel() {
         return matchTerm && matchStatut && matchMode && matchPeriode
       })
       .sort((a, b) => (a.date < b.date ? 1 : -1))
-  }, [nouveaux, extras, q, statut, mode, periode])
+  }, [paiements, q, statut, mode, periode])
 
-  function enregistrer(paiement: NouveauPaiement) {
-    const numero = numeroRecu(nouveaux.length)
-    const { soldeRestant, ...reste } = paiement
-    setNouveaux((prev) => [{ ...reste, recu: numero }, ...prev])
+  function versRecu(...argument: Parameters<typeof construireRecuData>) {
+    setRecuData(construireRecuData(...argument))
+  }
+
+  function construireRecuData(
+    p: {
+      numeroRecu: string
+      eleveNom: string | null
+      matricule: string | null
+      classeNom: string | null
+      montant: number
+      date: string
+      mode: string
+      motif: string | null
+      reference: string | null
+      enregistrePar: string | null
+      soldeRestant: number
+    },
+  ): RecuData {
+    return {
+      ...p,
+      numeroRecu: p.numeroRecu,
+      eleveNom: p.eleveNom ?? '',
+      matricule: p.matricule ?? '',
+      anneeScolaire: options?.anneeLabel ?? '',
+      etablissement: options?.etablissement ?? {
+        organisation: '',
+        nom: '',
+        commune: '',
+        ville: '',
+        telephone: '',
+        email: '',
+      },
+    }
+  }
+
+  function apresEnregistrement(p: PaiementEnregistre) {
     setFormOpen(false)
-    setRecu({
-      recu: numero,
-      eleveId: paiement.eleveId,
-      montant: paiement.montant,
-      date: paiement.date,
-      mode: paiement.mode,
-      motif: paiement.motif,
-      reference: paiement.reference,
-      enregistrePar: paiement.enregistrePar,
-      soldeRestant,
-    })
+    versRecu(p)
+    router.refresh()
   }
 
   return (
     <>
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Montant attendu (FCFA)"
-          value={montantCourt(kpis.montantAttendu)}
-          hint="Année scolaire en cours"
-          icon={Wallet}
-          accent="sky"
-        />
-        <StatCard
-          label="Montant encaissé (FCFA)"
-          value={montantCourt(montantEncaisse)}
-          hint={
-            encaisseSession > 0
-              ? `dont ${formatFCFA(encaisseSession)} en séance`
-              : `${kpis.elevesAJour} élève(s) soldé(s)`
-          }
-          icon={CircleDollarSign}
-          accent="primary"
-        />
-        <StatCard
-          label="Reste à recouvrer (FCFA)"
-          value={montantCourt(resteRecouvrer)}
-          hint={`${kpis.elevesEnRetard} élève(s) en retard`}
-          icon={Receipt}
-          accent="rose"
-        />
-        <StatCard
-          label="Taux de recouvrement"
-          value={`${taux}%`}
-          hint={`${nouveaux.length + paiementsInitiaux.length} paiement(s) au total`}
-          icon={TrendingUp}
-          accent="amber"
-        />
-      </section>
+      {kpis ? (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Montant attendu (FCFA)"
+            value={montantCourt(kpis.montantAttendu)}
+            hint="Année scolaire en cours"
+            icon={Wallet}
+            accent="sky"
+          />
+          <StatCard
+            label="Montant encaissé (FCFA)"
+            value={montantCourt(kpis.montantEncaisse)}
+            hint={`${kpis.elevesAJour} élève(s) soldé(s)`}
+            icon={CircleDollarSign}
+            accent="primary"
+          />
+          <StatCard
+            label="Reste à recouvrer (FCFA)"
+            value={montantCourt(kpis.resteRecouvrer)}
+            hint={`${kpis.elevesEnRetard} élève(s) en retard`}
+            icon={Receipt}
+            accent="rose"
+          />
+          <StatCard
+            label="Taux de recouvrement"
+            value={`${kpis.tauxRecouvrement}%`}
+            hint={`${kpis.nbPaiements} paiement(s) au total`}
+            icon={TrendingUp}
+            accent="amber"
+          />
+        </section>
+      ) : null}
 
-      <Card>
-        <CardContent className="flex flex-col gap-2 p-5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              Progression du recouvrement
-            </span>
-            <span className="font-semibold tabular-nums">
-              {formatFCFA(montantEncaisse)} / {formatFCFA(kpis.montantAttendu)}
-            </span>
-          </div>
-          <Progress value={taux} />
-        </CardContent>
-      </Card>
+      {kpis ? (
+        <Card>
+          <CardContent className="flex flex-col gap-2 p-5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Progression du recouvrement
+              </span>
+              <span className="font-semibold tabular-nums">
+                {formatFCFA(kpis.montantEncaisse)} / {formatFCFA(kpis.montantAttendu)}
+              </span>
+            </div>
+            <Progress value={kpis.tauxRecouvrement} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardContent className="flex flex-col gap-4 p-4 md:p-5">
@@ -272,7 +253,7 @@ export function FinancesPanel() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => setFormOpen(true)}>
+            <Button onClick={() => setFormOpen(true)} disabled={!options}>
               <CircleDollarSign className="size-4" data-icon="inline-start" />
               Enregistrer un paiement
             </Button>
@@ -290,7 +271,11 @@ export function FinancesPanel() {
                 title="Aucun paiement pour cette sélection"
                 description="Ajustez vos filtres ou enregistrez un nouveau paiement pour le voir apparaître ici."
               >
-                <Button variant="outline" onClick={() => setFormOpen(true)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setFormOpen(true)}
+                  disabled={!options}
+                >
                   <CircleDollarSign className="size-4" data-icon="inline-start" />
                   Enregistrer un paiement
                 </Button>
@@ -320,19 +305,18 @@ export function FinancesPanel() {
                 <TableBody>
                   {lignes.map((l) => (
                     <TableRow key={l.id}>
-                      <TableCell className="font-mono text-xs">{l.recu}</TableCell>
+                      <TableCell className="font-mono text-xs">{l.recu ?? '—'}</TableCell>
                       <TableCell>
-                        {l.eleve ? (
+                        {l.eleveId ? (
                           <Link
-                            href={`/eleves/${l.eleve.id}`}
+                            href={`/eleves/${l.eleveId}`}
                             className="flex flex-col underline-offset-4 hover:underline"
                           >
                             <span className="font-medium leading-tight">
-                              {l.eleve.prenoms} {l.eleve.nom}
+                              {l.eleveNom}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {getClasse(l.eleve.classeId)?.nom ?? '—'} ·{' '}
-                              {l.eleve.matricule}
+                              {l.classeNom ?? '—'} · {l.matricule ?? '—'}
                             </span>
                           </Link>
                         ) : (
@@ -341,7 +325,7 @@ export function FinancesPanel() {
                       </TableCell>
                       <TableCell className="tabular-nums">{l.date}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {l.motif}
+                        {l.motif ?? '—'}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{l.mode}</Badge>
@@ -356,7 +340,7 @@ export function FinancesPanel() {
                         <PaymentBadge statut={l.statut} />
                       </TableCell>
                       <TableCell className="hidden text-muted-foreground xl:table-cell">
-                        {l.enregistrePar}
+                        {l.enregistrePar ?? '—'}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -364,9 +348,11 @@ export function FinancesPanel() {
                           size="icon-sm"
                           aria-label={`Voir le reçu ${l.recu}`}
                           onClick={() =>
-                            setRecu({
-                              recu: l.recu,
-                              eleveId: l.eleveId,
+                            versRecu({
+                              numeroRecu: l.recu ?? '—',
+                              eleveNom: l.eleveNom,
+                              matricule: l.matricule,
+                              classeNom: l.classeNom,
                               montant: l.montant,
                               date: l.date,
                               mode: l.mode,
@@ -389,29 +375,31 @@ export function FinancesPanel() {
         </CardContent>
       </Card>
 
-      <PaiementForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        paiementsSupplementaires={extras}
-        onSubmit={enregistrer}
-      />
+      {options ? (
+        <PaiementForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          options={options}
+          onSuccess={apresEnregistrement}
+        />
+      ) : null}
 
       <Dialog
-        open={recu !== null}
+        open={recuData !== null}
         onOpenChange={(next) => {
-          if (!next) setRecu(null)
+          if (!next) setRecuData(null)
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader data-print-hidden>
             <DialogTitle>Reçu de paiement</DialogTitle>
             <DialogDescription>
-              Document généré en mode maquette — données de démonstration.
+              Reçu généré à partir de l&apos;encaissement enregistré.
             </DialogDescription>
           </DialogHeader>
-          {recu ? <RecuDocument data={recu} /> : null}
+          {recuData ? <RecuDocument data={recuData} /> : null}
           <DialogFooter data-print-hidden>
-            <Button variant="outline" onClick={() => setRecu(null)}>
+            <Button variant="outline" onClick={() => setRecuData(null)}>
               Fermer
             </Button>
             <Button onClick={() => window.print()}>

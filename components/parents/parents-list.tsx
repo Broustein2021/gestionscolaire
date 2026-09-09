@@ -2,7 +2,18 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Contact, Mail, Phone, Plus, Search, Users } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Contact,
+  Loader2,
+  Mail,
+  Phone,
+  Plus,
+  Search,
+  Users,
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { creerResponsable, modifierResponsable } from '@/lib/parents-create'
 import type { Parent } from '@/lib/queries/parents'
 
 const liensParente = ['Père', 'Mère', 'Tuteur', 'Tutrice', 'Autre'] as const
@@ -36,21 +48,74 @@ function initials(prenoms: string, nom: string) {
 }
 
 function ParentFormDialog({
+  schoolId,
   parent,
   trigger,
 }: {
+  schoolId: string | null
   parent?: Parent
   trigger: React.ReactNode
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [etat, setEtat] = useState<'saisie' | 'envoi' | 'succes' | 'erreur'>('saisie')
+  const [message, setMessage] = useState('')
+
+  const [nom, setNom] = useState('')
+  const [prenoms, setPrenoms] = useState('')
+  const [profession, setProfession] = useState('')
+  const [telephone, setTelephone] = useState('')
+  const [email, setEmail] = useState('')
+  const [adresse, setAdresse] = useState('')
+
+  const edition = Boolean(parent)
+
+  function reinitialiser() {
+    setNom(parent?.nom ?? '')
+    setPrenoms(parent?.prenoms ?? '')
+    setProfession(parent?.profession ?? '')
+    setTelephone(parent?.telephone ?? '')
+    setEmail(parent?.email ?? '')
+    setAdresse(parent?.adresse ?? '')
+    setEtat('saisie')
+    setMessage('')
+  }
+
+  async function enregistrer() {
+    if (!schoolId) return
+    const input = {
+      schoolId,
+      nom,
+      prenoms,
+      telephone,
+      email,
+      profession,
+      adresse,
+    }
+    setEtat('envoi')
+    setMessage('')
+
+    const res = edition && parent
+      ? await modifierResponsable(parent.id, input)
+      : await creerResponsable(input)
+
+    if (res.ok) {
+      setEtat('succes')
+      router.refresh()
+    } else {
+      setMessage(res.message)
+      setEtat('erreur')
+    }
+  }
+
+  const desactive = etat === 'envoi'
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        reinitialiser()
         setOpen(next)
-        if (!next) setSaved(false)
       }}
     >
       <DialogTrigger render={trigger as React.ReactElement} />
@@ -58,67 +123,130 @@ function ParentFormDialog({
         <DialogHeader>
           <DialogTitle>{parent ? 'Modifier le responsable' : 'Nouveau responsable'}</DialogTitle>
           <DialogDescription>
-            {saved
-              ? 'Enregistré en mode maquette — les données ne sont pas encore persistées.'
-              : 'Renseignez les informations du parent ou du tuteur légal.'}
+            Renseignez les informations du parent ou du tuteur légal.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p-nom">Nom</Label>
-            <Input id="p-nom" defaultValue={parent?.nom} placeholder="Kouadio" />
+
+        {etat === 'succes' ? (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 py-6 text-center">
+            <CheckCircle2 className="size-10 text-primary" />
+            <p className="font-medium">
+              {edition ? 'Responsable modifié' : 'Responsable enregistré'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {prenoms.trim()} {nom.trim()}
+            </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p-prenoms">Prénoms</Label>
-            <Input id="p-prenoms" defaultValue={parent?.prenoms} placeholder="Émile" />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="p-nom">Nom</Label>
+              <Input
+                id="p-nom"
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                disabled={desactive}
+                placeholder="Kouadio"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="p-prenoms">Prénoms</Label>
+              <Input
+                id="p-prenoms"
+                value={prenoms}
+                onChange={(e) => setPrenoms(e.target.value)}
+                disabled={desactive}
+                placeholder="Émile"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="p-prof">Profession</Label>
+              <Input
+                id="p-prof"
+                value={profession}
+                onChange={(e) => setProfession(e.target.value)}
+                disabled={desactive}
+                placeholder="Ingénieur"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="p-tel">Téléphone</Label>
+              <Input
+                id="p-tel"
+                value={telephone}
+                onChange={(e) => setTelephone(e.target.value)}
+                disabled={desactive}
+                placeholder="+225 07 00 00 00 00"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="p-mail">Email</Label>
+              <Input
+                id="p-mail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={desactive}
+                placeholder="parent@email.ci"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <Label htmlFor="p-adresse">Adresse</Label>
+              <Input
+                id="p-adresse"
+                value={adresse}
+                onChange={(e) => setAdresse(e.target.value)}
+                disabled={desactive}
+                placeholder="Cocody, Riviera…"
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p-lien">Lien de parenté</Label>
-            <Select defaultValue={parent?.lien ?? 'Père'}>
-              <SelectTrigger id="p-lien">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {liensParente.map((lien) => (
-                  <SelectItem key={lien} value={lien}>
-                    {lien}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        )}
+
+        {etat === 'erreur' ? (
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>{message}</span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p-prof">Profession</Label>
-            <Input id="p-prof" defaultValue={parent?.profession ?? ''} placeholder="Ingénieur" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p-tel">Téléphone</Label>
-            <Input id="p-tel" defaultValue={parent?.telephone ?? ''} placeholder="+225 07 00 00 00 00" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p-mail">Email</Label>
-            <Input
-              id="p-mail"
-              type="email"
-              defaultValue={parent?.email ?? ''}
-              placeholder="parent@email.ci"
-            />
-          </div>
-        </div>
+        ) : null}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Annuler
-          </Button>
-          <Button onClick={() => setSaved(true)} disabled={saved}>
-            {saved ? 'Enregistré' : 'Enregistrer'}
-          </Button>
+          {etat === 'succes' ? (
+            <Button
+              onClick={() => {
+                setOpen(false)
+                reinitialiser()
+              }}
+            >
+              Terminé
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={desactive}>
+                Annuler
+              </Button>
+              <Button
+                onClick={enregistrer}
+                disabled={desactive || !schoolId || !nom.trim() || !prenoms.trim()}
+              >
+                {desactive ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
+                    Enregistrement…
+                  </>
+                ) : (
+                  'Enregistrer'
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-export function ParentsList({ parents }: { parents: Parent[] }) {
+export function ParentsList({ parents, schoolId }: { parents: Parent[]; schoolId: string | null }) {
   const [q, setQ] = useState('')
   const [lien, setLien] = useState('tous')
 
@@ -174,6 +302,7 @@ export function ParentsList({ parents }: { parents: Parent[] }) {
               description="Commencez par ajouter votre premier parent ou tuteur légal."
             >
               <ParentFormDialog
+                schoolId={schoolId}
                 trigger={
                   <Button>
                     <Plus className="size-4" data-icon="inline-start" />
@@ -254,6 +383,7 @@ export function ParentsList({ parents }: { parents: Parent[] }) {
 
                 <div className="flex items-center gap-2 border-t pt-3">
                   <ParentFormDialog
+                    schoolId={schoolId}
                     parent={p}
                     trigger={
                       <Button variant="outline" size="sm">

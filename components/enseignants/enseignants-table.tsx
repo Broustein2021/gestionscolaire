@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { GraduationCap, Mail, Phone, Plus, Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  GraduationCap,
+  Loader2,
+  Mail,
+  Phone,
+  Plus,
+  Search,
+} from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,102 +45,310 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { creerEnseignant } from '@/lib/enseignants-create'
 import type { Enseignant, MatiereRef } from '@/lib/queries/enseignants'
 
-function EnseignantDialog({
+export type EnseignantOptions = {
+  schoolId: string
+  academicYearId: string
+  matieres: MatiereRef[]
+  classes: { id: string; nom: string }[]
+}
+
+type EtatFormulaire = 'saisie' | 'envoi' | 'succes' | 'erreur'
+
+const AUCUNE = '__aucune'
+
+export function EnseignantDialog({
+  options,
   enseignant,
-  matieres,
   trigger,
 }: {
+  options: EnseignantOptions | null
   enseignant?: Enseignant
-  matieres: MatiereRef[]
   trigger: React.ReactNode
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [etat, setEtat] = useState<EtatFormulaire>('saisie')
+  const [message, setMessage] = useState('')
+  const [resultat, setResultat] = useState<{ matricule: string } | null>(null)
+
+  const [nom, setNom] = useState('')
+  const [prenoms, setPrenoms] = useState('')
+  const [sexe, setSexe] = useState<'M' | 'F'>('M')
+  const [telephone, setTelephone] = useState('')
+  const [email, setEmail] = useState('')
+  const [dateEmbauche, setDateEmbauche] = useState('')
+  const [matiereId, setMatiereId] = useState(AUCUNE)
+  const [classeId, setClasseId] = useState(AUCUNE)
+
+  const consultation = Boolean(enseignant)
+
+  function reinitialiser() {
+    setNom(enseignant?.nom ?? '')
+    setPrenoms(enseignant?.prenoms ?? '')
+    setSexe(enseignant?.sexe ?? 'M')
+    setTelephone(enseignant?.telephone === '—' ? '' : (enseignant?.telephone ?? ''))
+    setEmail(enseignant?.email === '—' ? '' : (enseignant?.email ?? ''))
+    setDateEmbauche(enseignant?.dateEmbauche ?? '')
+    setMatiereId(AUCUNE)
+    setClasseId(AUCUNE)
+    setEtat('saisie')
+    setMessage('')
+    setResultat(null)
+  }
+
+  async function enregistrer() {
+    if (!options) return
+    setEtat('envoi')
+    setMessage('')
+    const res = await creerEnseignant({
+      schoolId: options.schoolId,
+      academicYearId: options.academicYearId,
+      nom: nom.trim(),
+      prenoms: prenoms.trim(),
+      sexe,
+      telephone,
+      email,
+      hiredOn: dateEmbauche,
+      matiereId: matiereId === AUCUNE ? null : matiereId,
+      classeId: classeId === AUCUNE ? null : classeId,
+    })
+    if (res.ok) {
+      setResultat({ matricule: res.matricule })
+      setEtat('succes')
+      router.refresh()
+    } else {
+      setMessage(res.message)
+      setEtat('erreur')
+    }
+  }
+
+  const champsDesactives = consultation || etat === 'envoi'
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        reinitialiser()
         setOpen(next)
-        if (!next) setSaved(false)
       }}
     >
       <DialogTrigger render={trigger as React.ReactElement} />
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {enseignant ? `${enseignant.prenoms} ${enseignant.nom}` : 'Nouvel enseignant'}
+            {consultation
+              ? `Fiche ${enseignant!.prenoms} ${enseignant!.nom}`
+              : 'Nouvel enseignant'}
           </DialogTitle>
           <DialogDescription>
-            {saved
-              ? 'Enregistré — la création réelle sera branchée au module Enseignants.'
-              : 'Identité, contact et affectation pédagogique.'}
+            {consultation
+              ? 'Détails du dossier et classes affectées.'
+              : 'Identité, contact et affectation pour l\u2019année scolaire courante.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="t-nom">Nom</Label>
-            <Input id="t-nom" defaultValue={enseignant?.nom} placeholder="Kouassi" />
+
+        {etat === 'succes' && resultat ? (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 py-6 text-center">
+            <CheckCircle2 className="size-10 text-primary" />
+            <p className="font-medium">Enseignant enregistré</p>
+            <p className="text-sm text-muted-foreground">
+              Matricule attribué : <span className="font-mono">{resultat.matricule}</span>
+            </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="t-prenoms">Prénoms</Label>
-            <Input id="t-prenoms" defaultValue={enseignant?.prenoms} placeholder="Jean-Marc" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="t-tel">Téléphone</Label>
-            <Input id="t-tel" defaultValue={enseignant?.telephone} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="t-mail">Email</Label>
-            <Input id="t-mail" type="email" defaultValue={enseignant?.email} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="t-matiere">Matière principale</Label>
-            <Select defaultValue={enseignant?.matiereIds[0] ?? matieres[0]?.id}>
-              <SelectTrigger id="t-matiere">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {matieres.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="t-embauche">Date d&apos;embauche</Label>
-            <Input id="t-embauche" type="date" defaultValue={enseignant?.dateEmbauche ?? ''} />
-          </div>
-        </div>
-        {enseignant && enseignant.classes.length > 0 ? (
-          <div className="flex flex-col gap-2 rounded-lg border p-3">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Classes affectées
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {enseignant.classes.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/classes/${c.id}`}
-                  className="rounded-md border px-2 py-1 text-sm hover:bg-accent"
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="t-nom">Nom</Label>
+                <Input
+                  id="t-nom"
+                  value={nom}
+                  onChange={(e) => setNom(e.target.value)}
+                  disabled={champsDesactives}
+                  placeholder="Kouassi"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="t-prenoms">Prénoms</Label>
+                <Input
+                  id="t-prenoms"
+                  value={prenoms}
+                  onChange={(e) => setPrenoms(e.target.value)}
+                  disabled={champsDesactives}
+                  placeholder="Jean-Marc"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="t-sexe">Sexe</Label>
+                <Select
+                  value={sexe}
+                  onValueChange={(v) => setSexe(v === 'F' ? 'F' : 'M')}
+                  disabled={champsDesactives}
                 >
-                  {c.nom}
-                </Link>
-              ))}
+                  <SelectTrigger id="t-sexe">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="M">Masculin</SelectItem>
+                    <SelectItem value="F">Féminin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="t-embauche">Date d&apos;embauche</Label>
+                <Input
+                  id="t-embauche"
+                  type="date"
+                  value={dateEmbauche}
+                  onChange={(e) => setDateEmbauche(e.target.value)}
+                  disabled={champsDesactives}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="t-tel">Téléphone</Label>
+                <Input
+                  id="t-tel"
+                  value={telephone}
+                  onChange={(e) => setTelephone(e.target.value)}
+                  disabled={champsDesactives}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="t-mail">Email</Label>
+                <Input
+                  id="t-mail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={champsDesactives}
+                />
+              </div>
             </div>
+
+            {consultation ? null : (
+              <>
+                <div className="flex flex-col gap-3 rounded-lg border p-3">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Affectation pédagogique (optionnel)
+                  </span>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="t-matiere">Matière</Label>
+                      <Select
+                        value={matiereId}
+                        onValueChange={(v) => setMatiereId(v ?? AUCUNE)}
+                        disabled={etat === 'envoi'}
+                      >
+                        <SelectTrigger id="t-matiere">
+                          <SelectValue placeholder="À choisir" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={AUCUNE}>Aucune</SelectItem>
+                          {options?.matieres.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.nom}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="t-classe">Classe</Label>
+                      <Select
+                        value={classeId}
+                        onValueChange={(v) => setClasseId(v ?? AUCUNE)}
+                        disabled={etat === 'envoi'}
+                      >
+                        <SelectTrigger id="t-classe">
+                          <SelectValue placeholder="À choisir" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={AUCUNE}>Aucune</SelectItem>
+                          {options?.classes.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.nom}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    L&apos;affectation est rattachée à l&apos;année scolaire courante.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {consultation && enseignant && enseignant.classes.length > 0 ? (
+              <div className="flex flex-col gap-2 rounded-lg border p-3">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Classes affectées
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {enseignant.classes.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/classes/${c.id}`}
+                      className="rounded-md border px-2 py-1 text-sm hover:bg-accent"
+                    >
+                      {c.nom}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {etat === 'erreur' ? (
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>{message}</span>
           </div>
         ) : null}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Fermer
-          </Button>
-          <Button onClick={() => setSaved(true)} disabled={saved}>
-            {saved ? 'Enregistré' : 'Enregistrer'}
-          </Button>
+          {consultation ? (
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Fermer
+            </Button>
+          ) : etat === 'succes' ? (
+            <Button
+              onClick={() => {
+                setOpen(false)
+                reinitialiser()
+              }}
+            >
+              Terminé
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={etat === 'envoi'}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={enregistrer}
+                disabled={etat === 'envoi' || !options || !nom.trim() || !prenoms.trim()}
+              >
+                {etat === 'envoi' ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
+                    Enregistrement…
+                  </>
+                ) : (
+                  'Enregistrer'
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -140,9 +358,11 @@ function EnseignantDialog({
 export function EnseignantsTable({
   enseignants,
   matieres,
+  options,
 }: {
   enseignants: Enseignant[]
   matieres: MatiereRef[]
+  options: EnseignantOptions | null
 }) {
   const [q, setQ] = useState('')
   const [matiereId, setMatiereId] = useState('toutes')
@@ -214,7 +434,7 @@ export function EnseignantsTable({
               description="Commencez par ajouter votre premier enseignant."
             >
               <EnseignantDialog
-                matieres={matieres}
+                options={options}
                 trigger={
                   <Button>
                     <Plus className="size-4" data-icon="inline-start" />
@@ -297,8 +517,8 @@ export function EnseignantsTable({
                     </TableCell>
                     <TableCell>
                       <EnseignantDialog
+                        options={options}
                         enseignant={t}
-                        matieres={matieres}
                         trigger={
                           <Button variant="ghost" size="sm">
                             Consulter
@@ -316,5 +536,3 @@ export function EnseignantsTable({
     </Card>
   )
 }
-
-export { EnseignantDialog }

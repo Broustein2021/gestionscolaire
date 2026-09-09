@@ -8,11 +8,15 @@ import {
   EnseignantDialog,
 } from '@/components/enseignants/enseignants-table'
 import { getEnseignantsData } from '@/lib/queries/enseignants'
+import { getEvaluationOptions } from '@/lib/queries/grades'
 
 export const metadata = { title: 'Enseignants — GESTION-SCOLAIRE' }
 
 export default async function EnseignantsPage() {
-  const { enseignants, matieres } = await getEnseignantsData()
+  const [{ enseignants, matieres }, options] = await Promise.all([
+    getEnseignantsData(),
+    getEvaluationOptions(),
+  ])
 
   const actifs = enseignants.filter((t) => t.statut === 'actif')
   const affectations = enseignants.reduce((s, t) => s + t.classes.length, 0)
@@ -26,7 +30,7 @@ export default async function EnseignantsPage() {
         description="Corps enseignant, matières et affectations par classe"
       >
         <EnseignantDialog
-          matieres={matieres}
+          options={options}
           trigger={
             <Button>
               <Plus className="size-4" data-icon="inline-start" />
@@ -60,7 +64,7 @@ export default async function EnseignantsPage() {
         />
       </div>
 
-      <EnseignantsTable enseignants={enseignants} matieres={matieres} />
+      <EnseignantsTable enseignants={enseignants} matieres={matieres} options={options} />
     </>
   )
 }

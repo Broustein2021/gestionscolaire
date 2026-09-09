@@ -1,13 +1,15 @@
 ﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   AlertCircle,
   CheckCircle2,
+  Loader2,
   PencilRuler,
   Save,
   ShieldCheck,
+  UserX,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -38,83 +40,158 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 import { StatutEvaluationBadge } from '@/components/evaluations/evaluations-table'
-import {
-  anneesScolaires,
-  classes,
-  evaluations,
-  getClasse,
-  getElevesByClasse,
-  getEnseignant,
-  getMatiere,
-  notesEvaluation,
-  trimestres,
-} from '@/lib/data'
+import type { StatutEvaluation } from '@/lib/grades-meta'
+import { chargerNotes, sauvegarderNotes } from '@/lib/grades-write'
+import type { SaisieNotesData } from '@/lib/grades-write'
+import type { Evaluation, EvaluationOptions } from '@/lib/queries/grades'
 
 type Etat = 'brouillon' | 'enregistre' | 'valide'
 
-export function SaisieNotes() {
+export function SaisieNotes({
+  options,
+  evaluations,
+}: {
+  options: EvaluationOptions | null
+  evaluations: Evaluation[]
+}) {
   const params = useSearchParams()
+  const router = useRouter()
   const evaluationParam = params.get('evaluation')
 
-  const [anneeId, setAnneeId] = useState(anneesScolaires[0].id)
-  const [periode, setPeriode] = useState(trimestres[0])
-  const [classeId, setClasseId] = useState<string>(
-    () => evaluations.find((e) => e.id === evaluationParam)?.classeId ?? classes[3].id,
-  )
+  const classes = options?.classes ?? []
+  const termes = options?.termes ?? []
+
+  const [periodeId, setPeriodeId] = useState<string>(() => termes[0]?.id ?? '')
+  const [classeId, setClasseId] = useState<string>(() => {
+    const cible = evaluations.find((e) => e.id === evaluationParam)?.classeId
+    return cible ?? classes[0]?.id ?? ''
+  })
   const [matiereId, setMatiereId] = useState<string>('toutes')
   const [evaluationId, setEvaluationId] = useState<string>(
     () => evaluationParam ?? '',
   )
+
+  const [feuille, setFeuille] = useState<SaisieNotesData | null>(null)
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const [absents, setAbsents] = useState<Record<string, boolean>>({})
+  const [chargement, setChargement] = useState(false)
+  const [sauvegarde, setSauvegarde] = useState(false)
   const [etat, setEtat] = useState<Etat>('brouillon')
+  const [erreur, setErreur] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
   const evaluationsClasse = useMemo(
     () =>
       evaluations.filter(
         (ev) =>
           ev.classeId === classeId &&
-          ev.periode === periode &&
           (matiereId === 'toutes' || ev.matiereId === matiereId),
       ),
-    [classeId, periode, matiereId],
+    [evaluations, classeId, matiereId],
   )
 
-  const evaluation = evaluations.find((ev) => ev.id === evaluationId)
-  const eleves = evaluation ? getElevesByClasse(evaluation.classeId) : []
-  const matiere = evaluation ? getMatiere(evaluation.matiereId) : undefined
-  const enseignant = evaluation ? getEnseignant(evaluation.enseignantId) : undefined
+  const matieresDisponibles = useMemo(() => {
+    const ids = Array.from(
+      new Set(
+        evaluations
+          .filter((ev) => ev.classeId === classeId && ev.matiereId)
+          .map((ev) => ev.matiereId as string),
+      ),
+    )
+    return Array.from(new Set(ids)).map((id) => {
+      const ev = evaluations.find((e) => e.matiereId === id)
+      return { id, nom: ev?.matiereNom ?? null }
+    })
+  }, [evaluations, classeId])
 
-  // Pré-remplissage des notes déjà saisies (données de démonstration)
+  // Chargement des notes réelles à chaque changement d'évaluation
   useEffect(() => {
-    if (!evaluationId) return
-    const existantes = notesEvaluation[evaluationId] ?? []
-    const map: Record<string, string> = {}
-    for (const n of existantes) {
-      if (n.note !== null) map[n.eleveId] = String(n.note)
+    if (!evaluationId) {
+      setFeuille(null)
+      setNotes({})
+      setAbsents({})
+      setErreur(null)
+      setMessage(null)
+      return
     }
-    setNotes(map)
+    let actif = true
+    setChargement(true)
+    setErreur(null)
+    setMessage(null)
     setEtat('brouillon')
+    chargerNotes(evaluationId).then((donnees) => {
+      if (!actif) return
+      setChargement(false)
+      if (!donnees) {
+        setFeuille(null)
+        return
+      }
+      setFeuille(donnees)
+      const map: Record<string, string> = {}
+      const abs: Record<string, boolean> = {}
+      for (const e of donnees.eleves) {
+        if (e.note !== null) map[e.studentId] = String(e.note)
+        abs[e.studentId] = e.absent
+      }
+      setNotes(map)
+      setAbsents(abs)
+      setEtat(donnees.evaluation.statut === 'validee' ? 'valide' : 'brouillon')
+    })
+    return () => {
+      actif = false
+    }
   }, [evaluationId])
+
+  const bareme = feuille?.evaluation.bareme ?? 20
 
   function erreurNote(valeur: string) {
     if (valeur.trim() === '') return null
     const n = Number(valeur.replace(',', '.'))
     if (Number.isNaN(n)) return 'Valeur invalide'
     if (n < 0) return 'La note ne peut pas être négative'
-    if (evaluation && n > evaluation.bareme)
-      return `La note ne peut pas dépasser ${evaluation.bareme}`
+    if (n > bareme) return `La note ne peut pas dépasser ${bareme}`
     return null
   }
 
-  const erreurs = eleves.filter((e) => erreurNote(notes[e.id] ?? '') !== null)
-  const saisies = eleves.filter((e) => (notes[e.id] ?? '').trim() !== '')
+  const eleves = feuille?.eleves ?? []
+  const saisies = eleves.filter(
+    (e) => absents[e.studentId] || (notes[e.studentId] ?? '').trim() !== '',
+  )
   const manquantes = eleves.length - saisies.length
-  const valeurs = saisies
-    .map((e) => Number((notes[e.id] ?? '').replace(',', '.')))
+  const valeurs = eleves
+    .map((e) => Number((notes[e.studentId] ?? '').replace(',', '.')))
     .filter((n) => !Number.isNaN(n))
-  const moyenne =
-    valeurs.length > 0 ? valeurs.reduce((s, n) => s + n, 0) / valeurs.length : 0
+  const moyenne = valeurs.length > 0 ? valeurs.reduce((s, n) => s + n, 0) / valeurs.length : 0
+
+  const verrouille = etat === 'valide'
+
+  async function enregistrer(valider: boolean) {
+    if (!feuille) return
+    setSauvegarde(true)
+    setErreur(null)
+    setMessage(null)
+    const rows = eleves.map((e) => ({
+      studentId: e.studentId,
+      note: absents[e.studentId]
+        ? null
+        : (() => {
+            const n = Number((notes[e.studentId] ?? '').replace(',', '.'))
+            return Number.isNaN(n) ? null : n
+          })(),
+      absent: absents[e.studentId] ?? false,
+    }))
+    const resultat = await sauvegarderNotes(feuille.evaluation.id, rows, valider)
+    if (resultat.ok) {
+      setEtat(valider ? 'valide' : 'enregistre')
+      setMessage(resultat.message)
+      router.refresh()
+    } else {
+      setErreur(resultat.message)
+    }
+    setSauvegarde(false)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -122,42 +199,28 @@ export function SaisieNotes() {
         <CardHeader>
           <CardTitle>Sélection de l&apos;évaluation</CardTitle>
           <CardDescription>
-            Année scolaire, période, classe puis matière pour retrouver
-            l&apos;évaluation à noter
+            Période, classe puis matière pour retrouver l&apos;évaluation à noter —{' '}
+            {options?.anneeLabel ?? 'année courante'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="n-annee">Année scolaire</Label>
-            <Select value={anneeId} onValueChange={(value) => setAnneeId(value ?? '')}>
-              <SelectTrigger id="n-annee">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {anneesScolaires.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.libelle}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="n-periode">Période</Label>
             <Select
-              value={periode}
+              value={periodeId}
               onValueChange={(v) => {
-                setPeriode(v ?? '')
+                setPeriodeId((v as string) ?? '')
                 setEvaluationId('')
               }}
             >
               <SelectTrigger id="n-periode">
-                <SelectValue />
+                <SelectValue placeholder="Choisir" />
               </SelectTrigger>
               <SelectContent>
-                {trimestres.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
+                {termes.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.label}
+                    {t.estCourant ? ' (en cours)' : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -168,12 +231,13 @@ export function SaisieNotes() {
             <Select
               value={classeId}
               onValueChange={(v) => {
-                setClasseId(v ?? '')
+                setClasseId((v as string) ?? '')
+                setMatiereId('toutes')
                 setEvaluationId('')
               }}
             >
               <SelectTrigger id="n-classe">
-                <SelectValue />
+                <SelectValue placeholder="Choisir" />
               </SelectTrigger>
               <SelectContent>
                 {classes.map((c) => (
@@ -189,7 +253,7 @@ export function SaisieNotes() {
             <Select
               value={matiereId}
               onValueChange={(v) => {
-                setMatiereId(v ?? '')
+                setMatiereId((v as string) ?? 'toutes')
                 setEvaluationId('')
               }}
             >
@@ -198,15 +262,9 @@ export function SaisieNotes() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="toutes">Toutes</SelectItem>
-                {Array.from(
-                  new Set(
-                    evaluations
-                      .filter((ev) => ev.classeId === classeId)
-                      .map((ev) => ev.matiereId),
-                  ),
-                ).map((mid) => (
-                  <SelectItem key={mid} value={mid}>
-                    {getMatiere(mid)?.nom}
+                {matieresDisponibles.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.nom}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -233,16 +291,18 @@ export function SaisieNotes() {
         </CardContent>
       </Card>
 
-      {!evaluation ? (
+      {!feuille ? (
         <Card>
           <CardContent className="p-0">
             <EmptyState
               icon={PencilRuler}
-              title="Sélectionnez une évaluation"
+              title={chargement ? 'Chargement des notes…' : 'Sélectionnez une évaluation'}
               description={
-                evaluationsClasse.length === 0
-                  ? `Aucune évaluation n'est planifiée pour ${getClasse(classeId)?.nom} sur cette période. Créez-la depuis le module Évaluations.`
-                  : "Choisissez l'évaluation à noter dans la liste ci-dessus pour afficher les élèves."
+                chargement
+                  ? "Récupération des notes déjà saisies en cours."
+                  : evaluationsClasse.length === 0
+                    ? `Aucune évaluation n'est planifiée pour ${classes.find((c) => c.id === classeId)?.nom ?? 'cette classe'}. Créez-la depuis le module Évaluations.`
+                    : "Choisissez l'évaluation à noter dans la liste ci-dessus pour afficher les élèves."
               }
             />
           </CardContent>
@@ -252,17 +312,17 @@ export function SaisieNotes() {
           <CardHeader className="gap-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex flex-col gap-1">
-                <CardTitle>{evaluation.libelle}</CardTitle>
+                <CardTitle>{feuille.evaluation.libelle}</CardTitle>
                 <CardDescription>
-                  {getClasse(evaluation.classeId)?.nom} — {matiere?.nom} —{' '}
-                  {enseignant ? `${enseignant.prenoms} ${enseignant.nom}` : '—'} —{' '}
-                  {new Date(evaluation.date).toLocaleDateString('fr-FR')}
+                  {feuille.evaluation.statut === 'validee'
+                    ? 'Notes validées — la modification est verrouillée.'
+                    : `${feuille.evaluation.bareme} points — coefficient ${feuille.evaluation.coefficient}`}
                 </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Barème /{evaluation.bareme}</Badge>
-                <Badge variant="outline">Coef. {evaluation.coefficient}</Badge>
-                <StatutEvaluationBadge statut={evaluation.statut} />
+                <Badge variant="outline">Barème /{feuille.evaluation.bareme}</Badge>
+                <Badge variant="outline">Coef. {feuille.evaluation.coefficient}</Badge>
+                <StatutEvaluationBadge statut={feuille.evaluation.statut as StatutEvaluation} />
               </div>
             </div>
 
@@ -276,7 +336,7 @@ export function SaisieNotes() {
               <span className="text-muted-foreground">
                 Moyenne :{' '}
                 <span className="font-medium text-foreground tabular-nums">
-                  {valeurs.length > 0 ? `${moyenne.toFixed(2)}/${evaluation.bareme}` : '—'}
+                  {valeurs.length > 0 ? `${moyenne.toFixed(2)}/${bareme}` : '—'}
                 </span>
               </span>
               {manquantes > 0 ? (
@@ -300,17 +360,18 @@ export function SaisieNotes() {
                   <TableRow>
                     <TableHead>Élève</TableHead>
                     <TableHead className="w-40">Note</TableHead>
+                    <TableHead className="text-center">Absence</TableHead>
                     <TableHead className="text-center">Barème</TableHead>
-                    <TableHead className="text-center">Coef.</TableHead>
                     <TableHead>Statut</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {eleves.map((e) => {
-                    const valeur = notes[e.id] ?? ''
+                    const valeur = notes[e.studentId] ?? ''
                     const erreur = erreurNote(valeur)
+                    const absent = absents[e.studentId] ?? false
                     return (
-                      <TableRow key={e.id}>
+                      <TableRow key={e.studentId}>
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-medium leading-tight">
@@ -327,19 +388,20 @@ export function SaisieNotes() {
                             inputMode="decimal"
                             step="0.25"
                             min={0}
-                            max={evaluation.bareme}
-                            value={valeur}
-                            disabled={etat === 'valide'}
+                            max={bareme}
+                            value={absent ? '' : valeur}
+                            disabled={verrouille || absent}
+                            placeholder={absent ? 'Absent' : undefined}
                             onChange={(ev) =>
-                              setNotes((n) => ({ ...n, [e.id]: ev.target.value }))
+                              setNotes((n) => ({ ...n, [e.studentId]: ev.target.value }))
                             }
                             aria-label={`Note de ${e.prenoms} ${e.nom}`}
                             aria-invalid={erreur ? true : undefined}
-                            className={
-                              erreur
-                                ? 'w-28 border-destructive tabular-nums'
-                                : 'w-28 tabular-nums'
-                            }
+                            className={cn(
+                              'w-28 tabular-nums',
+                              erreur ? 'border-destructive' : '',
+                              absent ? 'opacity-60' : '',
+                            )}
                           />
                           {erreur ? (
                             <span className="mt-1 block text-xs text-destructive">
@@ -347,21 +409,55 @@ export function SaisieNotes() {
                             </span>
                           ) : null}
                         </TableCell>
-                        <TableCell className="text-center tabular-nums text-muted-foreground">
-                          /{evaluation.bareme}
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={verrouille}
+                            onClick={() => {
+                              setAbsents((a) => ({
+                                ...a,
+                                [e.studentId]: !(a[e.studentId] ?? false),
+                              }))
+                              setNotes((n) => {
+                                if ((n[e.studentId] ?? '') !== '') {
+                                  const next = { ...n }
+                                  delete next[e.studentId]
+                                  return next
+                                }
+                                return n
+                              })
+                            }}
+                            aria-pressed={absent}
+                          >
+                            <UserX
+                              className={cn(
+                                'size-4',
+                                absent ? 'text-destructive' : 'text-muted-foreground',
+                              )}
+                            />
+                            {absent ? 'Absent' : 'Marquer absent'}
+                          </Button>
                         </TableCell>
                         <TableCell className="text-center tabular-nums text-muted-foreground">
-                          {evaluation.coefficient}
+                          /{bareme}
                         </TableCell>
                         <TableCell>
-                          {valeur.trim() === '' ? (
+                          {absent ? (
+                            <Badge
+                              variant="secondary"
+                              className="border-transparent bg-chart-3/15 text-chart-3"
+                            >
+                              Absent
+                            </Badge>
+                          ) : valeur.trim() === '' ? (
                             <Badge
                               variant="secondary"
                               className="border-transparent bg-muted text-muted-foreground"
                             >
                               Non saisie
                             </Badge>
-                          ) : etat === 'valide' ? (
+                          ) : verrouille ? (
                             <Badge
                               variant="secondary"
                               className="border-transparent bg-primary/10 text-primary"
@@ -384,18 +480,27 @@ export function SaisieNotes() {
               </Table>
             </div>
 
+            {erreur ? (
+              <div className="mx-4 rounded-lg border border-destructive bg-destructive/5 px-3 py-2 text-sm text-destructive md:mx-6">
+                {erreur}
+              </div>
+            ) : message ? (
+              <div className="mx-4 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary md:mx-6">
+                <CheckCircle2 className="size-4" />
+                {message}
+              </div>
+            ) : null}
+
             <Separator />
 
             <div className="flex flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between md:px-6">
               <p className="text-xs text-muted-foreground">
-                {etat === 'valide'
+                {verrouille
                   ? 'Notes validées : la modification est verrouillée.'
-                  : etat === 'enregistre'
-                    ? 'Brouillon enregistré (mode maquette, sans persistance).'
-                    : 'Mode maquette : la saisie n’est pas encore persistée en base.'}
+                  : 'Les notes sont sauvegardées dans la base — utilisez « Enregistrer » en cours de saisie.'}
               </p>
               <div className="flex items-center gap-2">
-                {etat === 'valide' ? (
+                {verrouille ? (
                   <Button variant="outline" onClick={() => setEtat('brouillon')}>
                     Modifier les notes
                   </Button>
@@ -403,15 +508,19 @@ export function SaisieNotes() {
                   <>
                     <Button
                       variant="outline"
-                      onClick={() => setEtat('enregistre')}
-                      disabled={erreurs.length > 0}
+                      onClick={() => enregistrer(false)}
+                      disabled={sauvegarde}
                     >
-                      <Save className="size-4" data-icon="inline-start" />
+                      {sauvegarde ? (
+                        <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
+                      ) : (
+                        <Save className="size-4" data-icon="inline-start" />
+                      )}
                       Enregistrer le brouillon
                     </Button>
                     <Button
-                      onClick={() => setEtat('valide')}
-                      disabled={erreurs.length > 0 || saisies.length === 0}
+                      onClick={() => enregistrer(true)}
+                      disabled={sauvegarde || saisies.length === 0}
                     >
                       <ShieldCheck className="size-4" data-icon="inline-start" />
                       Valider les notes
@@ -426,4 +535,3 @@ export function SaisieNotes() {
     </div>
   )
 }
-

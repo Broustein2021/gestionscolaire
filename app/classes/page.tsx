@@ -4,12 +4,14 @@ import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
 import { Button } from '@/components/ui/button'
 import { ClassesGrid } from '@/components/classes/classes-grid'
+import { ClasseDialog } from '@/components/classes/classe-dialog'
 import { getClasses, getNiveaux, cycles } from '@/lib/queries/classes'
+import { getClasseOptions } from '@/lib/queries/class-options'
 
 export const metadata = { title: 'Classes & Niveaux — GESTION-SCOLAIRE' }
 
 export default async function ClassesPage() {
-  const classes = await getClasses()
+  const [classes, options] = await Promise.all([getClasses(), getClasseOptions()])
   const niveaux = getNiveaux(classes)
 
   const effectif = classes.reduce((s, c) => s + c.effectif, 0)
@@ -19,10 +21,15 @@ export default async function ClassesPage() {
   return (
     <>
       <PageHeader title="Classes & Niveaux" description="Organisation pédagogique">
-        <Button>
-          <Plus className="size-4" data-icon="inline-start" />
-          Nouvelle classe
-        </Button>
+        <ClasseDialog
+          options={options}
+          trigger={
+            <Button>
+              <Plus className="size-4" data-icon="inline-start" />
+              Nouvelle classe
+            </Button>
+          }
+        />
       </PageHeader>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -50,7 +57,7 @@ export default async function ClassesPage() {
         />
       </div>
 
-      <ClassesGrid classes={classes} cycles={cycles} niveaux={niveaux} />
+      <ClassesGrid classes={classes} cycles={cycles} niveaux={niveaux} options={options} />
     </>
   )
 }

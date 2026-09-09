@@ -5,12 +5,14 @@ import { StatCard } from '@/components/stat-card'
 import { Button } from '@/components/ui/button'
 import { MatieresTable, MatiereDialog } from '@/components/matieres/matieres-table'
 import { getMatieres } from '@/lib/queries/matieres'
+import { getCurrentSchoolContext } from '@/lib/queries/school-context'
 import { cycles } from '@/lib/queries/classes'
 
 export const metadata = { title: 'Matières — GESTION-SCOLAIRE' }
 
 export default async function MatieresPage() {
-  const matieres = await getMatieres()
+  const [matieres, ctx] = await Promise.all([getMatieres(), getCurrentSchoolContext()])
+  const schoolId = ctx?.schoolId ?? null
 
   const totalCoef = matieres.reduce((s, m) => s + m.coefficient, 0)
   const college = matieres.filter((m) => m.cycle === 'Collège').length
@@ -23,6 +25,7 @@ export default async function MatieresPage() {
         description="Programme, coefficients et enseignants responsables"
       >
         <MatiereDialog
+          schoolId={schoolId}
           trigger={
             <Button>
               <Plus className="size-4" data-icon="inline-start" />
@@ -45,7 +48,7 @@ export default async function MatieresPage() {
         <StatCard label="Cycle Primaire" value={primaire} icon={Layers} accent="rose" />
       </div>
 
-      <MatieresTable matieres={matieres} cycles={cycles} />
+      <MatieresTable matieres={matieres} cycles={cycles} schoolId={schoolId} />
     </>
   )
 }

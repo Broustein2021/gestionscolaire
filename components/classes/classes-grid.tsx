@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronRight, DoorOpen, School, Search, User } from 'lucide-react'
+import { ChevronRight, DoorOpen, Pencil, School, Search, User } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
@@ -16,15 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ClasseDialog } from '@/components/classes/classe-dialog'
 import type { Classe } from '@/lib/queries/classes'
+import type { ClasseOptions } from '@/lib/queries/class-options'
 
 type ClassesGridProps = {
   classes: Classe[]
   cycles: readonly string[]
   niveaux: string[]
+  options: ClasseOptions | null
 }
 
-export function ClassesGrid({ classes, cycles, niveaux }: ClassesGridProps) {
+export function ClassesGrid({ classes, cycles, niveaux, options }: ClassesGridProps) {
   const [q, setQ] = useState('')
   const [cycle, setCycle] = useState('tous')
   const [niveau, setNiveau] = useState('tous')
@@ -100,11 +104,12 @@ export function ClassesGrid({ classes, cycles, niveaux }: ClassesGridProps) {
           {filtered.map((c) => {
             const taux = c.capacite > 0 ? Math.round((c.effectif / c.capacite) * 100) : 0
             return (
-              <Link
-                key={c.id}
-                href={`/classes/${c.id}`}
-                className="rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
+              <div key={c.id} className="relative rounded-xl">
+                <Link
+                  href={`/classes/${c.id}`}
+                  className="absolute inset-0 z-0 rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  aria-label={`Voir la fiche ${c.nom}`}
+                />
                 <Card className="h-full transition-colors hover:bg-accent/40">
                   <CardContent className="flex h-full flex-col gap-4 p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -117,7 +122,23 @@ export function ClassesGrid({ classes, cycles, niveaux }: ClassesGridProps) {
                           <Badge variant="outline">{c.niveau}</Badge>
                         </div>
                       </div>
-                      <ChevronRight className="mt-1 size-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1">
+                        <ClasseDialog
+                          options={options}
+                          classe={c}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="relative z-10 -mr-1 -mt-0.5 size-7 text-muted-foreground"
+                              aria-label={`Modifier ${c.nom}`}
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+                          }
+                        />
+                        <ChevronRight className="mt-1 size-4 text-muted-foreground" />
+                      </div>
                     </div>
 
                     <div className="flex flex-col gap-2">
@@ -147,7 +168,7 @@ export function ClassesGrid({ classes, cycles, niveaux }: ClassesGridProps) {
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             )
           })}
         </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Receipt } from 'lucide-react'
+import { Loader2, Receipt } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,83 +21,64 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatFCFA, modesPaiement } from '@/lib/data'
 import {
-  categoriesFrais,
-  eleves,
-  formatFCFA,
-  getClasse,
-  modesPaiement,
-  type Paiement,
-} from '@/lib/data'
+  enregistrerPaiement,
+  type PaiementEnregistre,
+} from '@/lib/payments-create'
+import type { FinancesOptions } from '@/lib/queries/finances'
 
-const CAISSIER = 'Mme Koné (Caisse)'
-
-export type NouveauPaiement = Paiement & { soldeRestant: number }
+type Props = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  options: FinancesOptions
+  eleveIdParDefaut?: string
+  onSuccess: (paiement: PaiementEnregistre) => void
+}
 
 export function PaiementForm({
   open,
   onOpenChange,
-  paiementsSupplementaires,
+  options,
   eleveIdParDefaut,
-  onSubmit,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  /** Montants déjà encaissés pendant la session (maquette), par élève. */
-  paiementsSupplementaires: Record<string, number>
-  eleveIdParDefaut?: string
-  onSubmit: (paiement: NouveauPaiement) => void
-}) {
-  const [eleveId, setEleveId] = useState(eleveIdParDefaut ?? eleves[0].id)
-  const [categorieId, setCategorieId] = useState(categoriesFrais[1].id)
+  onSuccess,
+}: Props) {
+  const [eleveId, setEleveId] = useState(eleveIdParDefaut ?? options.eleves[0]?.id ?? '')
+  const [categorieId, setCategorieId] = useState(options.categories[0]?.id ?? '')
   const [montant, setMontant] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [mode, setMode] = useState<Paiement['mode']>('Espèces')
+  const [mode, setMode] = useState<string>(modesPaiement[0])
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
   const [erreur, setErreur] = useState<string | null>(null)
+  const [envoi, setEnvoi] = useState(false)
 
-  const eleve = eleves.find((e) => e.id === eleveId)
-  const categorie = categoriesFrais.find((c) => c.id === categorieId)
+  const eleve = options.eleves.find((e) => e.id === eleveId)
+  const categorie = options.categories.find((c) => c.id === categorieId)
 
-  const elevesActifs = useMemo(
-    () => eleves.filter((e) => e.statut !== 'archive'),
-    [],
-  )
-
-  // Base UI affiche la valeur brute si aucun libellé n'est fourni via `items`.
   const libellesEleves = useMemo(
     () =>
       Object.fromEntries(
-        elevesActifs.map((e) => [
+        options.eleves.map((e) => [
           e.id,
-          `${e.nom} ${e.prenoms} — ${getClasse(e.classeId)?.nom ?? '—'}`,
+          `${e.nom} ${e.prenoms} — ${e.classeNom ?? '—'}`,
         ]),
       ),
-    [elevesActifs],
-  )
-
-  const libellesCategories = useMemo(
-    () =>
-      Object.fromEntries(
-        categoriesFrais.map((c) => [c.id, `${c.nom} — ${formatFCFA(c.montant)}`]),
-      ),
-    [],
+    [options.eleves],
   )
 
   const situation = useMemo(() => {
     if (!eleve) return null
-    const dejaPaye = eleve.montantPaye + (paiementsSupplementaires[eleve.id] ?? 0)
-    const reste = Math.max(0, eleve.montantDu - dejaPaye)
     const nouveau = Number(montant) || 0
+    const reste = Math.max(0, eleve.montantDu - eleve.montantPaye)
     return {
       montantDu: eleve.montantDu,
-      dejaPaye,
+      dejaPaye: eleve.montantPaye,
       reste,
       nouveau,
       resteApres: Math.max(0, reste - nouveau),
     }
-  }, [eleve, montant, paiementsSupplementaires])
+  }, [eleve, montant])
 
   function reinitialiser() {
     setMontant('')
@@ -106,9 +87,13 @@ export function PaiementForm({
     setErreur(null)
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    if (envoi) return
     const valeur = Number(montant)
-    if (!eleve) return
+    if (!eleveId) {
+      setErreur('Sélectionnez un élève.')
+      return
+    }
     if (!Number.isFinite(valeur) || valeur <= 0) {
       setErreur('Saisissez un montant supérieur à 0.')
       return
@@ -117,23 +102,34 @@ export function PaiementForm({
       setErreur('La date du paiement est obligatoire.')
       return
     }
+
+    setErreur(null)
+    setEnvoi(true)
+
     const motif = notes.trim()
       ? `${categorie?.nom ?? 'Frais'} — ${notes.trim()}`
       : (categorie?.nom ?? 'Frais divers')
 
-    onSubmit({
-      id: `pay-local-${Date.now()}`,
-      recu: '',
-      eleveId: eleve.id,
-      montant: valeur,
+    const res = await enregistrerPaiement({
+      schoolId: options.schoolId,
+      academicYearId: options.academicYearId,
+      anneePrefixe: options.anneePrefixe,
+      studentId: eleveId,
+      feeCategoryId: categorieId || null,
+      amount: valeur,
       date,
-      mode,
+      method: mode,
+      reference: reference.trim() || undefined,
       motif,
-      reference: reference.trim() || '—',
-      enregistrePar: CAISSIER,
-      soldeRestant: situation ? Math.max(0, situation.reste - valeur) : 0,
     })
-    reinitialiser()
+    setEnvoi(false)
+
+    if (res.ok) {
+      reinitialiser()
+      onSuccess(res.paiement)
+    } else {
+      setErreur(res.message)
+    }
   }
 
   return (
@@ -157,7 +153,6 @@ export function PaiementForm({
           <div className="flex flex-col gap-2">
             <Label htmlFor="paiement-eleve">Élève</Label>
             <Select
-              items={libellesEleves}
               value={eleveId}
               onValueChange={(v) => setEleveId(v as string)}
             >
@@ -165,7 +160,7 @@ export function PaiementForm({
                 <SelectValue placeholder="Sélectionner un élève" />
               </SelectTrigger>
               <SelectContent>
-                {elevesActifs.map((e) => (
+                {options.eleves.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
                     {libellesEleves[e.id]}
                   </SelectItem>
@@ -207,7 +202,6 @@ export function PaiementForm({
             <div className="flex flex-col gap-2">
               <Label htmlFor="paiement-categorie">Catégorie de frais</Label>
               <Select
-                items={libellesCategories}
                 value={categorieId}
                 onValueChange={(v) => setCategorieId(v as string)}
               >
@@ -215,9 +209,9 @@ export function PaiementForm({
                   <SelectValue placeholder="Catégorie" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categoriesFrais.map((c) => (
+                  {options.categories.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {libellesCategories[c.id]}
+                      {c.nom} — {formatFCFA(c.montant)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -254,7 +248,7 @@ export function PaiementForm({
               <Label htmlFor="paiement-mode">Mode de paiement</Label>
               <Select
                 value={mode}
-                onValueChange={(v) => setMode(v as Paiement['mode'])}
+                onValueChange={(v) => setMode(v as (typeof modesPaiement)[number])}
               >
                 <SelectTrigger id="paiement-mode" className="w-full">
                   <SelectValue placeholder="Mode" />
@@ -293,19 +287,28 @@ export function PaiementForm({
           </div>
 
           {erreur ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               {erreur}
             </p>
           ) : null}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={envoi}>
             Annuler
           </Button>
-          <Button onClick={handleSubmit}>
-            <Receipt className="size-4" data-icon="inline-start" />
-            Enregistrer et générer le reçu
+          <Button onClick={handleSubmit} disabled={envoi}>
+            {envoi ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Enregistrement...
+              </>
+            ) : (
+              <>
+                <Receipt className="size-4" data-icon="inline-start" />
+                Enregistrer et générer le reçu
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

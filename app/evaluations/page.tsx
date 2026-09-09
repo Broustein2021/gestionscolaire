@@ -7,11 +7,14 @@ import {
   EvaluationsTable,
   EvaluationDialog,
 } from '@/components/evaluations/evaluations-table'
-import { etablissement, evaluations } from '@/lib/data'
+import { getEvaluations, getEvaluationOptions } from '@/lib/queries/grades'
 
 export const metadata = { title: 'Évaluations — GESTION-SCOLAIRE' }
 
-export default function EvaluationsPage() {
+export default async function EvaluationsPage() {
+  const options = await getEvaluationOptions()
+  const evaluations = options ? await getEvaluations() : []
+
   const planifiees = evaluations.filter((e) => e.statut === 'planifiee').length
   const saisies = evaluations.filter((e) => e.statut === 'saisie').length
   const validees = evaluations.filter((e) => e.statut === 'validee').length
@@ -20,11 +23,16 @@ export default function EvaluationsPage() {
     <>
       <PageHeader
         title="Évaluations"
-        description={`Devoirs, interrogations et compositions — ${etablissement.periodeCourante}`}
+        description={
+          options
+            ? `Devoirs, interrogations et compositions — ${options.termes[0]?.label ?? ''}, ${options.anneeLabel}`
+            : 'Devoirs, interrogations et compositions'
+        }
       >
         <EvaluationDialog
+          options={options}
           trigger={
-            <Button>
+            <Button disabled={!options}>
               <Plus className="size-4" data-icon="inline-start" />
               Créer une évaluation
             </Button>
@@ -36,7 +44,7 @@ export default function EvaluationsPage() {
         <StatCard
           label="Évaluations"
           value={evaluations.length}
-          hint="Période en cours"
+          hint="Période à jour"
           icon={ClipboardList}
         />
         <StatCard
@@ -56,12 +64,12 @@ export default function EvaluationsPage() {
         <StatCard
           label="Validées"
           value={validees}
-          hint="Intégrées aux moyennes"
+          hint="Intégrées aux bulletins"
           icon={CheckCircle2}
         />
       </div>
 
-      <EvaluationsTable />
+      <EvaluationsTable evaluations={evaluations} options={options} />
     </>
   )
 }

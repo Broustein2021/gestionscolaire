@@ -1,10 +1,22 @@
-import { etablissement, formatFCFA, type bulletinEleve } from '@/lib/data'
+import { formatFCFA } from '@/lib/data'
+import type { BulletinData } from '@/lib/queries/grades'
 
-type Bulletin = NonNullable<ReturnType<typeof bulletinEleve>>
-
-export function BulletinDocument({ bulletin }: { bulletin: Bulletin }) {
-  const { eleve, classe, lignes, totalCoef, totalPoints, moyenneGenerale, rang, effectif } =
-    bulletin
+export function BulletinDocument({ bulletin }: { bulletin: BulletinData }) {
+  const {
+    eleve,
+    classeNom,
+    periodeLabel,
+    lignes,
+    totalCoef,
+    totalPoints,
+    moyenneGenerale,
+    appreciationGenerale,
+    rang,
+    effectif,
+    montantDu,
+    montantPaye,
+    etablissement,
+  } = bulletin
 
   return (
     <div
@@ -24,7 +36,7 @@ export function BulletinDocument({ bulletin }: { bulletin: Bulletin }) {
         <div className="flex flex-col gap-0.5 sm:text-right">
           <p className="font-serif text-lg font-semibold">Bulletin de notes</p>
           <p className="text-sm text-muted-foreground">
-            {etablissement.periodeCourante} — {etablissement.anneeScolaire}
+            {periodeLabel ?? 'Période'} — Année en cours
           </p>
         </div>
       </header>
@@ -42,7 +54,7 @@ export function BulletinDocument({ bulletin }: { bulletin: Bulletin }) {
         </div>
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">Classe</dt>
-          <dd className="font-medium">{classe?.nom ?? '—'}</dd>
+          <dd className="font-medium">{classeNom ?? '—'}</dd>
         </div>
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">Effectif</dt>
@@ -75,8 +87,8 @@ export function BulletinDocument({ bulletin }: { bulletin: Bulletin }) {
             </tr>
           </thead>
           <tbody>
-            {lignes.map((l) => (
-              <tr key={l.matiereId} className="border-t">
+            {lignes.map((l, i) => (
+              <tr key={`${l.matiere}-${i}`} className="border-t">
                 <td className="px-3 py-2 font-medium">{l.matiere}</td>
                 <td className="px-3 py-2 text-center tabular-nums">
                   {l.note.toFixed(2)}
@@ -87,13 +99,9 @@ export function BulletinDocument({ bulletin }: { bulletin: Bulletin }) {
                 <td className="px-3 py-2 text-center tabular-nums">
                   {l.points.toFixed(2)}
                 </td>
+                <td className="px-3 py-2 text-muted-foreground">{l.appreciation}</td>
                 <td className="px-3 py-2 text-muted-foreground">
-                  {l.appreciation}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">
-                  {l.enseignant
-                    ? `${l.enseignant.prenoms} ${l.enseignant.nom}`
-                    : '—'}
+                  {l.enseignant ?? '—'}
                 </td>
               </tr>
             ))}
@@ -118,23 +126,25 @@ export function BulletinDocument({ bulletin }: { bulletin: Bulletin }) {
         <div className="flex flex-col gap-0.5 rounded-lg border p-3">
           <span className="text-xs text-muted-foreground">Moyenne générale</span>
           <span className="text-xl font-semibold tabular-nums">
-            {moyenneGenerale.toFixed(2)} / 20
+            {moyenneGenerale > 0 ? `${moyenneGenerale.toFixed(2)} / 20` : '—'}
           </span>
         </div>
         <div className="flex flex-col gap-0.5 rounded-lg border p-3">
           <span className="text-xs text-muted-foreground">Rang</span>
           <span className="text-xl font-semibold tabular-nums">
-            {rang}
-            <span className="text-sm font-normal text-muted-foreground">
-              {' '}
-              / {effectif}
-            </span>
+            {moyenneGenerale > 0 ? rang : '—'}
+            {moyenneGenerale > 0 ? (
+              <span className="text-sm font-normal text-muted-foreground">
+                {' '}
+                / {effectif}
+              </span>
+            ) : null}
           </span>
         </div>
         <div className="flex flex-col gap-0.5 rounded-lg border p-3">
           <span className="text-xs text-muted-foreground">Appréciation</span>
           <span className="text-xl font-semibold">
-            {bulletin.appreciationGenerale}
+            {moyenneGenerale > 0 ? appreciationGenerale : '—'}
           </span>
         </div>
       </div>
@@ -144,7 +154,7 @@ export function BulletinDocument({ bulletin }: { bulletin: Bulletin }) {
           Situation financière au moment de l&apos;édition
         </span>
         <span>
-          Payé {formatFCFA(eleve.montantPaye)} sur {formatFCFA(eleve.montantDu)}
+          Payé {formatFCFA(montantPaye)} sur {formatFCFA(montantDu)}
         </span>
       </div>
 
