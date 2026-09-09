@@ -24,28 +24,33 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { classes, eleves, formatFCFA, getClasse } from '@/lib/data'
+import { formatFCFA } from '@/lib/data'
+import type { ClasseOption, Inscription } from '@/lib/queries/enrollments'
 
-export function InscriptionsTable() {
+type Props = {
+  inscriptions: Inscription[]
+  classes: ClasseOption[]
+}
+
+export function InscriptionsTable({ inscriptions, classes }: Props) {
   const [q, setQ] = useState('')
   const [classeId, setClasseId] = useState('toutes')
   const [statut, setStatut] = useState('tous')
 
-  const inscriptions = useMemo(() => {
+  const filtrees = useMemo(() => {
     const term = q.trim().toLowerCase()
-    return eleves
-      .filter((e) => e.statut !== 'archive')
-      .filter((e) => {
-        const matchTerm =
-          !term ||
-          `${e.prenoms} ${e.nom}`.toLowerCase().includes(term) ||
-          e.matricule.toLowerCase().includes(term)
-        const matchClasse = classeId === 'toutes' || e.classeId === classeId
-        const matchStatut = statut === 'tous' || e.statut === statut
-        return matchTerm && matchClasse && matchStatut
-      })
-      .sort((a, b) => b.dateInscription.localeCompare(a.dateInscription))
-  }, [q, classeId, statut])
+    return inscriptions.filter((i) => {
+      const matchTerm =
+        !term ||
+        `${i.prenoms} ${i.nom}`.toLowerCase().includes(term) ||
+        i.matricule.toLowerCase().includes(term)
+      const matchClasse = classeId === 'toutes' || i.classeId === classeId
+      const matchStatut =
+        statut === 'tous' ||
+        (statut === 'nouveau' ? i.isNouveau : !i.isNouveau)
+      return matchTerm && matchClasse && matchStatut
+    })
+  }, [q, classeId, statut, inscriptions])
 
   return (
     <Card>
@@ -87,10 +92,10 @@ export function InscriptionsTable() {
         </div>
 
         <div className="text-sm text-muted-foreground">
-          {inscriptions.length} dossier{inscriptions.length > 1 ? 's' : ''} d&apos;inscription
+          {filtrees.length} dossier{filtrees.length > 1 ? 's' : ''} d&apos;inscription
         </div>
 
-        {inscriptions.length === 0 ? (
+        {filtrees.length === 0 ? (
           <div className="rounded-lg border border-dashed">
             <EmptyState
               icon={UserPlus}
@@ -113,48 +118,47 @@ export function InscriptionsTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inscriptions.map((e) => {
-                  const classe = getClasse(e.classeId)
-                  return (
-                    <TableRow key={e.id}>
-                      <TableCell>
-                        <Link
-                          href={`/eleves/${e.id}`}
-                          className="font-medium underline-offset-4 hover:underline"
+                {filtrees.map((i) => (
+                  <TableRow key={i.studentId}>
+                    <TableCell>
+                      <Link
+                        href={`/eleves/${i.studentId}`}
+                        className="font-medium underline-offset-4 hover:underline"
+                      >
+                        {i.prenoms} {i.nom}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {i.matricule}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{i.classeNom ?? '—'}</Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {i.dateInscription
+                        ? new Date(i.dateInscription).toLocaleDateString('fr-FR')
+                        : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {i.isNouveau ? (
+                        <Badge
+                          variant="secondary"
+                          className="border-transparent bg-primary/10 text-primary"
                         >
-                          {e.prenoms} {e.nom}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {e.matricule}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{classe?.nom ?? '—'}</Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {new Date(e.dateInscription).toLocaleDateString('fr-FR')}
-                      </TableCell>
-                      <TableCell>
-                        {e.statut === 'nouveau' ? (
-                          <Badge
-                            variant="secondary"
-                            className="border-transparent bg-primary/10 text-primary"
-                          >
-                            Nouveau
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Réinscription</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatFCFA(e.montantDu - e.montantPaye)}
-                      </TableCell>
-                      <TableCell>
-                        <PaymentBadge statut={e.statutPaiement} />
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                          Nouveau
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Réinscription</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatFCFA(i.montantDu - i.montantPaye)}
+                    </TableCell>
+                    <TableCell>
+                      <PaymentBadge statut={i.statutPaiement} />
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -163,4 +167,3 @@ export function InscriptionsTable() {
     </Card>
   )
 }
-

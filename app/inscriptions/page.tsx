@@ -4,34 +4,40 @@ import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
 import { InscriptionWizard } from '@/components/inscriptions/inscription-wizard'
 import { InscriptionsTable } from '@/components/inscriptions/inscriptions-table'
-import { eleves, etablissement, formatFCFA, kpis } from '@/lib/data'
+import { formatFCFA } from '@/lib/data'
+import { getInscriptionOptions, getInscriptions } from '@/lib/queries/enrollments'
 
 export const metadata = {
   title: 'Inscriptions — GESTION-SCOLAIRE',
 }
 
-export default function InscriptionsPage() {
-  const nouveaux = eleves.filter((e) => e.statut === 'nouveau').length
-  const reinscriptions = eleves.filter((e) => e.statut === 'inscrit').length
+export default async function InscriptionsPage() {
+  const options = await getInscriptionOptions()
+  const inscriptions = options ? await getInscriptions() : []
 
-  const attenduInscriptions = eleves.reduce(
-    (total, eleve) => total + eleve.montantDu,
-    0,
-  )
+  const nouveaux = inscriptions.filter((i) => i.isNouveau).length
+  const reinscriptions = inscriptions.length - nouveaux
+  const attenduInscriptions = inscriptions.reduce((total, i) => total + i.montantDu, 0)
+
+  const anneeLibelle = options?.anneeCourante?.libelle ?? ''
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Inscriptions"
-        description={`Dossiers d'inscription — année scolaire ${etablissement.anneeScolaire}`}
+        description={
+          anneeLibelle
+            ? `Dossiers d'inscription — année scolaire ${anneeLibelle}`
+            : "Dossiers d'inscription"
+        }
       >
-        <InscriptionWizard />
+        {options ? <InscriptionWizard options={options} /> : null}
       </PageHeader>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Dossiers ouverts"
-          value={kpis.totalEleves}
+          label="Dossiers validés"
+          value={inscriptions.length}
           hint="Élèves inscrits cette année"
           icon={Users}
         />
@@ -61,7 +67,10 @@ export default function InscriptionsPage() {
         />
       </div>
 
-      <InscriptionsTable />
+      <InscriptionsTable
+        inscriptions={inscriptions}
+        classes={options?.classes ?? []}
+      />
     </div>
   )
 }

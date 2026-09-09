@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  UserPlus,
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,13 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  anneesScolaires,
-  categoriesFrais,
-  classes,
-  formatFCFA,
-  parents,
-} from '@/lib/data'
+import { formatFCFA } from '@/lib/data'
+import { enregistrerInscription } from '@/lib/enroll-create'
+import type { InscriptionOptions } from '@/lib/queries/enrollments'
 
 const etapes = [
   'Élève',
@@ -51,37 +53,52 @@ type Form = {
   adresse: string
   parentId: string
   lien: string
-  parentTelephone: string
-  parentEmail: string
-  anneeId: string
+  parentMode: 'existant' | 'nouveau'
+  nouveauParentNom: string
+  nouveauParentPrenoms: string
+  nouveauParentLien: string
+  nouveauParentTelephone: string
+  nouveauParentEmail: string
   classeId: string
   dateInscription: string
   statut: 'nouveau' | 'inscrit'
   fraisInscription: number
   scolarite: number
   reduction: number
+  acompte: number
 }
 
-const initial: Form = {
-  nom: '',
-  prenoms: '',
-  sexe: 'F',
-  dateNaissance: '',
-  lieuNaissance: '',
-  nationalite: 'Ivoirienne',
-  telephone: '',
-  adresse: '',
-  parentId: parents[0]?.id ?? '',
-  lien: 'Père',
-  parentTelephone: '',
-  parentEmail: '',
-  anneeId: anneesScolaires[0].id,
-  classeId: classes[3]?.id ?? classes[0].id,
-  dateInscription: new Date().toISOString().slice(0, 10),
-  statut: 'nouveau',
-  fraisInscription: categoriesFrais[0].montant,
-  scolarite: categoriesFrais[1].montant,
-  reduction: 0,
+function buildInitial(options: InscriptionOptions): Form {
+  const classeDefaut =
+    options.classes.find((c) => c.niveau === '6e') ?? options.classes[0]
+  const catInscription = options.frais.find((f) => /inscription/i.test(f.nom))
+  const catScolarite = options.frais.find((f) => /scolar/i.test(f.nom))
+
+  return {
+    nom: '',
+    prenoms: '',
+    sexe: 'F',
+    dateNaissance: '',
+    lieuNaissance: '',
+    nationalite: 'Ivoirienne',
+    telephone: '',
+    adresse: '',
+    parentId: options.responsables[0]?.id ?? '',
+    lien: 'Père',
+    parentMode: 'existant',
+    nouveauParentNom: '',
+    nouveauParentPrenoms: '',
+    nouveauParentLien: 'Père',
+    nouveauParentTelephone: '',
+    nouveauParentEmail: '',
+    classeId: classeDefaut?.id ?? '',
+    dateInscription: new Date().toISOString().slice(0, 10),
+    statut: 'nouveau',
+    fraisInscription: catInscription?.montant ?? 0,
+    scolarite: catScolarite?.montant ?? 0,
+    reduction: 0,
+    acompte: 0,
+  }
 }
 
 function Field({
@@ -115,18 +132,33 @@ function Recap({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function InscriptionWizard() {
+type Props = {
+  options: InscriptionOptions
+}
+
+export function InscriptionWizard({ options }: Props) {
+  const initial = useMemo(() => buildInitial(options), [options])
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<Form>(initial)
-  const [done, setDone] = useState(false)
+  const [envoi, setEnvoi] = useState(false)
+  const [erreur, setErreur] = useState('')
+  const [resultat, setResultat] = useState<
+    { matricule: string; avertissement?: string } | null
+  >(null)
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
 
-  const classe = classes.find((c) => c.id === form.classeId)
-  const parent = parents.find((p) => p.id === form.parentId)
-  const aPayer = form.fraisInscription + form.scolarite - form.reduction
+  const classe = options.classes.find((c) => c.id === form.classeId)
+  const parent = options.responsables.find((p) => p.id === form.parentId)
+
+  const montantTotal = Math.max(
+    0,
+    form.fraisInscription + form.scolarite - form.reduction,
+  )
+  const acompte = Math.min(Math.max(0, form.acompte), montantTotal)
+  const solde = montantTotal - acompte
 
   const etape1Valide = form.nom.trim() !== '' && form.prenoms.trim() !== ''
   const peutContinuer = step !== 0 || etape1Valide
@@ -134,12 +166,92 @@ export function InscriptionWizard() {
   function reset() {
     setStep(0)
     setForm(initial)
-    setDone(false)
+    setResultat(null)
+    setErreur('')
+    setEnvoi(false)
   }
 
   function onOpenChange(next: boolean) {
     setOpen(next)
     if (!next) reset()
+  }
+
+  async function soumettre() {
+    if (envoi) return
+    setErreur('')
+
+    if (!classe) {
+      setErreur('Sélectionnez une classe.')
+      return
+    }
+
+    if (form.parentMode === 'existant' && !form.parentId) {
+      setErreur('Sélectionnez un responsable existant.')
+      return
+    }
+
+    if (
+      form.parentMode === 'nouveau' &&
+      (form.nouveauParentNom.trim() === '' || form.nouveauParentPrenoms.trim() === '')
+    ) {
+      setErreur('Le nom et les prénoms du nouveau responsable sont obligatoires.')
+      return
+    }
+
+    const dateInscription =
+      form.dateInscription || new Date().toISOString().slice(0, 10)
+    const catInscription =
+      options.frais.find((f) => /inscription/i.test(f.nom)) ?? null
+
+    setEnvoi(true)
+    const res = await enregistrerInscription({
+      schoolId: options.schoolId,
+      academicYearId: options.academicYearId,
+      anneePrefixe: (
+        options.anneeCourante?.libelle ?? String(new Date().getFullYear())
+      ).slice(0, 4),
+      classe: { id: classe.id, levelLabel: classe.level_label },
+      eleve: {
+        nom: form.nom.trim(),
+        prenoms: form.prenoms.trim(),
+        sexe: form.sexe,
+        dateNaissance: form.dateNaissance,
+        lieuNaissance: form.lieuNaissance.trim(),
+        nationalite: form.nationalite.trim(),
+        telephone: form.telephone.trim(),
+        adresse: form.adresse.trim(),
+        statut: form.statut,
+      },
+      dateInscription,
+      responsable:
+        form.parentMode === 'nouveau'
+          ? {
+              mode: 'nouveau',
+              gardienId: null,
+              nouveau: {
+                nom: form.nouveauParentNom,
+                prenoms: form.nouveauParentPrenoms,
+                telephone: form.nouveauParentTelephone,
+                email: form.nouveauParentEmail,
+              },
+              lien: form.nouveauParentLien,
+            }
+          : { mode: 'existant', gardienId: form.parentId, lien: form.lien },
+      montants: {
+        fraisInscription: form.fraisInscription,
+        scolarite: form.scolarite,
+        reduction: form.reduction,
+        acompte: Math.max(0, form.acompte),
+      },
+      categorieInscriptionId: catInscription?.id ?? null,
+    })
+    setEnvoi(false)
+
+    if (res.ok) {
+      setResultat(res)
+    } else {
+      setErreur(res.message)
+    }
   }
 
   return (
@@ -153,7 +265,7 @@ export function InscriptionWizard() {
         }
       />
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        {done ? (
+        {resultat ? (
           <>
             <DialogHeader>
               <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -161,14 +273,25 @@ export function InscriptionWizard() {
               </div>
               <DialogTitle>Inscription enregistrée</DialogTitle>
               <DialogDescription>
-                Le dossier de {form.prenoms} {form.nom} a été créé pour la classe{' '}
-                {classe?.nom}. Montant à payer : {formatFCFA(aPayer)}.
+                Le dossier de {form.prenoms} {form.nom} a été créé{' '}
+                {resultat.matricule ? `(matricule ${resultat.matricule})` : ''}{' '}
+                pour la classe {classe?.nom}. Montant dû : {formatFCFA(montantTotal)} —{' '}
+                {acompte > 0
+                  ? `acompte ${formatFCFA(acompte)}, solde ${formatFCFA(solde)}`
+                  : `solde à payer ${formatFCFA(solde)}`}.
               </DialogDescription>
             </DialogHeader>
+
+            {resultat.avertissement ? (
+              <p className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-3 text-xs text-amber-700">
+                {resultat.avertissement}
+              </p>
+            ) : null}
+
             <p className="rounded-lg border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
-              Mode maquette : les données saisies ne sont pas encore persistées.
-              La base de données et l&apos;authentification seront branchées dans
-              une phase ultérieure.
+              Dossier créé avec succès et enregistré dans votre base de données
+              Supabase. Il apparaîtra dans la liste des inscriptions et dans le
+              dossier de l&apos;élève.
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={reset}>
@@ -286,75 +409,132 @@ export function InscriptionWizard() {
               ) : null}
 
               {step === 1 ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Responsable">
-                    <Select
-                      value={form.parentId}
-                      onValueChange={(v) => set('parentId', v ?? '')}
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant={form.parentMode === 'existant' ? 'secondary' : 'outline'}
+                      onClick={() => set('parentMode', 'existant')}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {parents.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.prenoms} {p.nom} — {p.lien}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Lien de parenté">
-                    <Select
-                      value={form.lien}
-                      onValueChange={(v) => set('lien', v ?? '')}
+                      Responsable existant
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={form.parentMode === 'nouveau' ? 'secondary' : 'outline'}
+                      onClick={() => set('parentMode', 'nouveau')}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Père">Père</SelectItem>
-                        <SelectItem value="Mère">Mère</SelectItem>
-                        <SelectItem value="Tuteur">Tuteur</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Téléphone du responsable" htmlFor="ptel">
-                    <Input
-                      id="ptel"
-                      value={form.parentTelephone || parent?.telephone || ''}
-                      onChange={(e) => set('parentTelephone', e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Email du responsable" htmlFor="pmail">
-                    <Input
-                      id="pmail"
-                      type="email"
-                      value={form.parentEmail || parent?.email || ''}
-                      onChange={(e) => set('parentEmail', e.target.value)}
-                    />
-                  </Field>
+                      Nouveau responsable
+                    </Button>
+                  </div>
+
+                  {form.parentMode === 'existant' ? (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field label="Responsable">
+                        <Select
+                          value={form.parentId}
+                          onValueChange={(v) => set('parentId', v ?? '')}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {options.responsables.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.prenoms} {p.nom} — {p.lien}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Lien de parenté">
+                        <Select
+                          value={form.lien}
+                          onValueChange={(v) => set('lien', v ?? '')}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Père">Père</SelectItem>
+                            <SelectItem value="Mère">Mère</SelectItem>
+                            <SelectItem value="Tuteur">Tuteur</SelectItem>
+                            <SelectItem value="Tutrice">Tutrice</SelectItem>
+                            <SelectItem value="Autre">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Téléphone du responsable">
+                        <Input value={parent?.telephone ?? ''} disabled />
+                      </Field>
+                      <Field label="Email du responsable">
+                        <Input value={parent?.email ?? ''} disabled />
+                      </Field>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field label="Nom" htmlFor="npnom" required>
+                        <Input
+                          id="npnom"
+                          value={form.nouveauParentNom}
+                          onChange={(e) => set('nouveauParentNom', e.target.value)}
+                          placeholder="Kouadio"
+                        />
+                      </Field>
+                      <Field label="Prénoms" htmlFor="npprenoms" required>
+                        <Input
+                          id="npprenoms"
+                          value={form.nouveauParentPrenoms}
+                          onChange={(e) => set('nouveauParentPrenoms', e.target.value)}
+                          placeholder="Émile"
+                        />
+                      </Field>
+                      <Field label="Lien de parenté">
+                        <Select
+                          value={form.nouveauParentLien}
+                          onValueChange={(v) => set('nouveauParentLien', v ?? '')}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Père">Père</SelectItem>
+                            <SelectItem value="Mère">Mère</SelectItem>
+                            <SelectItem value="Tuteur">Tuteur</SelectItem>
+                            <SelectItem value="Tutrice">Tutrice</SelectItem>
+                            <SelectItem value="Autre">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Téléphone" htmlFor="nptel">
+                        <Input
+                          id="nptel"
+                          value={form.nouveauParentTelephone}
+                          onChange={(e) => set('nouveauParentTelephone', e.target.value)}
+                          placeholder="+225 07 00 00 00 00"
+                        />
+                      </Field>
+                      <Field label="Email" htmlFor="npmail">
+                        <Input
+                          id="npmail"
+                          type="email"
+                          value={form.nouveauParentEmail}
+                          onChange={(e) => set('nouveauParentEmail', e.target.value)}
+                          placeholder="email@exemple.com"
+                        />
+                      </Field>
+                    </div>
+                  )}
                 </div>
               ) : null}
 
               {step === 2 ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="Année scolaire">
-                    <Select
-                      value={form.anneeId}
-                      onValueChange={(v) => set('anneeId', v ?? '')}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {anneesScolaires.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.libelle}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      value={options.anneeCourante?.libelle ?? '—'}
+                      disabled
+                      className="opacity-70"
+                    />
                   </Field>
                   <Field label="Classe">
                     <Select
@@ -365,7 +545,7 @@ export function InscriptionWizard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {classes.map((c) => (
+                        {options.classes.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.nom} — {c.cycle}
                           </SelectItem>
@@ -436,6 +616,16 @@ export function InscriptionWizard() {
                         onChange={(e) => set('reduction', Number(e.target.value))}
                       />
                     </Field>
+                    <Field label="Acompte versé aujourd'hui" htmlFor="acompte">
+                      <Input
+                        id="acompte"
+                        type="number"
+                        min={0}
+                        value={form.acompte}
+                        onChange={(e) => set('acompte', Number(e.target.value))}
+                        placeholder="0"
+                      />
+                    </Field>
                   </div>
                   <div className="flex flex-col gap-1 rounded-lg border bg-muted/40 p-4">
                     <Recap
@@ -453,12 +643,23 @@ export function InscriptionWizard() {
                         Montant à payer
                       </span>
                       <span className="text-lg font-semibold tabular-nums">
-                        {formatFCFA(aPayer)}
+                        {formatFCFA(montantTotal)}
                       </span>
                     </div>
+                    {acompte > 0 ? (
+                      <>
+                        <Recap
+                          label="Acompte versé"
+                          value={`- ${formatFCFA(acompte)}`}
+                        />
+                        <Recap label="Solde dû" value={formatFCFA(solde)} />
+                      </>
+                    ) : null}
                     <p className="text-xs text-muted-foreground">
-                      Échéancier suggéré : 3 versements de{' '}
-                      {formatFCFA(Math.round(aPayer / 3))}
+                      Échéancier suggéré : {Math.max(1, Math.ceil(solde / 3)) > 0
+                        ? `${Math.ceil(solde / 3) === 0 ? '—' : formatFCFA(Math.round(solde / 3))}`
+                        : '—'}{' '}
+                      sur 3 versements.
                     </p>
                   </div>
                 </div>
@@ -495,7 +696,13 @@ export function InscriptionWizard() {
                     </span>
                     <Recap
                       label="Responsable"
-                      value={parent ? `${parent.prenoms} ${parent.nom} (${form.lien})` : '—'}
+                      value={
+                        form.parentMode === 'nouveau'
+                          ? `${form.nouveauParentPrenoms} ${form.nouveauParentNom} (${form.nouveauParentLien})`
+                          : parent
+                            ? `${parent.prenoms} ${parent.nom} (${form.lien})`
+                            : '—'
+                      }
                     />
                     <Recap
                       label="Classe"
@@ -503,10 +710,7 @@ export function InscriptionWizard() {
                     />
                     <Recap
                       label="Année scolaire"
-                      value={
-                        anneesScolaires.find((a) => a.id === form.anneeId)
-                          ?.libelle ?? ''
-                      }
+                      value={options.anneeCourante?.libelle ?? '—'}
                     />
                     <Recap
                       label="Date d'inscription"
@@ -516,27 +720,56 @@ export function InscriptionWizard() {
                     />
                     <Recap
                       label="Statut"
-                      value={form.statut === 'nouveau' ? 'Nouvel élève' : 'Ancien élève'}
+                      value={
+                        form.statut === 'nouveau' ? 'Nouvel élève' : 'Ancien élève'
+                      }
                     />
                   </div>
-                  <div className="flex items-center justify-between rounded-lg border bg-primary/5 p-4">
-                    <span className="text-sm font-medium">Montant à payer</span>
-                    <Badge
-                      variant="secondary"
-                      className="border-transparent bg-primary/10 text-base tabular-nums text-primary"
-                    >
-                      {formatFCFA(aPayer)}
-                    </Badge>
+                  <div className="flex flex-col gap-1 rounded-lg border bg-primary/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Montant à payer</span>
+                      <Badge
+                        variant="secondary"
+                        className="border-transparent bg-primary/10 text-base tabular-nums text-primary"
+                      >
+                        {formatFCFA(montantTotal)}
+                      </Badge>
+                    </div>
+                    {acompte > 0 ? (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Acompte versé aujourd&apos;hui
+                        </span>
+                        <span className="font-medium tabular-nums">
+                          - {formatFCFA(acompte)}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Solde dû</span>
+                      <span className="font-semibold tabular-nums">
+                        {formatFCFA(solde)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ) : null}
             </div>
 
+            {erreur ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {erreur}
+              </div>
+            ) : null}
+
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => setStep((s) => Math.max(0, s - 1))}
-                disabled={step === 0}
+                disabled={step === 0 || envoi}
               >
                 <ChevronLeft className="size-4" data-icon="inline-start" />
                 Précédent
@@ -550,9 +783,18 @@ export function InscriptionWizard() {
                   <ChevronRight className="size-4" data-icon="inline-end" />
                 </Button>
               ) : (
-                <Button onClick={() => setDone(true)}>
-                  <Check className="size-4" data-icon="inline-start" />
-                  Confirmer l&apos;inscription
+                <Button onClick={soumettre} disabled={envoi}>
+                  {envoi ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="size-4" data-icon="inline-start" />
+                      Confirmer l&apos;inscription
+                    </>
+                  )}
                 </Button>
               )}
             </DialogFooter>
@@ -562,4 +804,3 @@ export function InscriptionWizard() {
     </Dialog>
   )
 }
-
