@@ -46,7 +46,9 @@ export async function getEleves(): Promise<Eleve[]> {
     return []
   }
 
-  const studentIds = rows
+  const studentIds = (rows as unknown as Array<{
+    students: { id: string } | Array<{ id: string }> | null
+  }>)
     .map((r) => (Array.isArray(r.students) ? r.students[0]?.id : r.students?.id))
     .filter((id): id is string => Boolean(id))
 

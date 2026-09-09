@@ -174,7 +174,9 @@ export async function getClassDetail(classId: string): Promise<ClassDetail | nul
     .eq('academic_year_id', ctx.academicYearId)
     .eq('status', 'validee')
 
-  const studentIds = (enrollmentRows ?? [])
+  const studentIds = ((enrollmentRows ?? []) as unknown as Array<{
+      students: { id: string } | Array<{ id: string }> | null
+    }>)
     .map((r) => (Array.isArray(r.students) ? r.students[0]?.id : r.students?.id))
     .filter((id): id is string => Boolean(id))
 

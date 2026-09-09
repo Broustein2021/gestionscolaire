@@ -47,7 +47,9 @@ export async function getParents(): Promise<Parent[]> {
     .select('guardian_id, relation, is_primary, students:student_id ( id, first_name, last_name )')
     .eq('school_id', ctx.schoolId)
 
-  const studentIds = (linkRows ?? [])
+  const studentIds = ((linkRows ?? []) as unknown as Array<{
+      students: { id: string } | Array<{ id: string }> | null
+    }>)
     .map((l) => (Array.isArray(l.students) ? l.students[0]?.id : l.students?.id))
     .filter((id): id is string => Boolean(id))
 

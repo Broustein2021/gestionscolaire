@@ -85,7 +85,7 @@ export function SaisieNotes() {
   const matiere = evaluation ? getMatiere(evaluation.matiereId) : undefined
   const enseignant = evaluation ? getEnseignant(evaluation.enseignantId) : undefined
 
-  // PrÃ©-remplissage des notes dÃ©jÃ  saisies (donnÃ©es de dÃ©monstration)
+  // Pré-remplissage des notes déjà saisies (données de démonstration)
   useEffect(() => {
     if (!evaluationId) return
     const existantes = notesEvaluation[evaluationId] ?? []
@@ -101,9 +101,9 @@ export function SaisieNotes() {
     if (valeur.trim() === '') return null
     const n = Number(valeur.replace(',', '.'))
     if (Number.isNaN(n)) return 'Valeur invalide'
-    if (n < 0) return 'La note ne peut pas Ãªtre nÃ©gative'
+    if (n < 0) return 'La note ne peut pas être négative'
     if (evaluation && n > evaluation.bareme)
-      return `La note ne peut pas dÃ©passer ${evaluation.bareme}`
+      return `La note ne peut pas dépasser ${evaluation.bareme}`
     return null
   }
 
@@ -120,15 +120,15 @@ export function SaisieNotes() {
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>SÃ©lection de l&apos;Ã©valuation</CardTitle>
+          <CardTitle>Sélection de l&apos;évaluation</CardTitle>
           <CardDescription>
-            AnnÃ©e scolaire, pÃ©riode, classe puis matiÃ¨re pour retrouver
-            l&apos;Ã©valuation Ã  noter
+            Année scolaire, période, classe puis matière pour retrouver
+            l&apos;évaluation à noter
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="n-annee">AnnÃ©e scolaire</Label>
+            <Label htmlFor="n-annee">Année scolaire</Label>
             <Select value={anneeId} onValueChange={(value) => setAnneeId(value ?? '')}>
               <SelectTrigger id="n-annee">
                 <SelectValue />
@@ -143,7 +143,7 @@ export function SaisieNotes() {
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="n-periode">PÃ©riode</Label>
+            <Label htmlFor="n-periode">Période</Label>
             <Select
               value={periode}
               onValueChange={(v) => {
@@ -185,7 +185,7 @@ export function SaisieNotes() {
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="n-matiere">MatiÃ¨re</Label>
+            <Label htmlFor="n-matiere">Matière</Label>
             <Select
               value={matiereId}
               onValueChange={(v) => {
@@ -213,13 +213,13 @@ export function SaisieNotes() {
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="n-eval">Ã‰valuation</Label>
+            <Label htmlFor="n-eval">Évaluation</Label>
             <Select
               value={evaluationId === '' ? null : evaluationId}
               onValueChange={(v) => setEvaluationId((v as string) ?? '')}
             >
               <SelectTrigger id="n-eval">
-                <SelectValue placeholder="SÃ©lectionner" />
+                <SelectValue placeholder="Sélectionner" />
               </SelectTrigger>
               <SelectContent>
                 {evaluationsClasse.map((ev) => (
@@ -238,11 +238,11 @@ export function SaisieNotes() {
           <CardContent className="p-0">
             <EmptyState
               icon={PencilRuler}
-              title="SÃ©lectionnez une Ã©valuation"
+              title="Sélectionnez une évaluation"
               description={
                 evaluationsClasse.length === 0
-                  ? `Aucune Ã©valuation n'est planifiÃ©e pour ${getClasse(classeId)?.nom} sur cette pÃ©riode. CrÃ©ez-la depuis le module Ã‰valuations.`
-                  : "Choisissez l'Ã©valuation Ã  noter dans la liste ci-dessus pour afficher les Ã©lÃ¨ves."
+                  ? `Aucune évaluation n'est planifiée pour ${getClasse(classeId)?.nom} sur cette période. Créez-la depuis le module Évaluations.`
+                  : "Choisissez l'évaluation à noter dans la liste ci-dessus pour afficher les élèves."
               }
             />
           </CardContent>
@@ -254,13 +254,13 @@ export function SaisieNotes() {
               <div className="flex flex-col gap-1">
                 <CardTitle>{evaluation.libelle}</CardTitle>
                 <CardDescription>
-                  {getClasse(evaluation.classeId)?.nom} â€” {matiere?.nom} â€”{' '}
-                  {enseignant ? `${enseignant.prenoms} ${enseignant.nom}` : 'â€”'} â€”{' '}
+                  {getClasse(evaluation.classeId)?.nom} — {matiere?.nom} —{' '}
+                  {enseignant ? `${enseignant.prenoms} ${enseignant.nom}` : '—'} —{' '}
                   {new Date(evaluation.date).toLocaleDateString('fr-FR')}
                 </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">BarÃ¨me /{evaluation.bareme}</Badge>
+                <Badge variant="outline">Barème /{evaluation.bareme}</Badge>
                 <Badge variant="outline">Coef. {evaluation.coefficient}</Badge>
                 <StatutEvaluationBadge statut={evaluation.statut} />
               </div>
@@ -276,7 +276,7 @@ export function SaisieNotes() {
               <span className="text-muted-foreground">
                 Moyenne :{' '}
                 <span className="font-medium text-foreground tabular-nums">
-                  {valeurs.length > 0 ? `${moyenne.toFixed(2)}/${evaluation.bareme}` : 'â€”'}
+                  {valeurs.length > 0 ? `${moyenne.toFixed(2)}/${evaluation.bareme}` : '—'}
                 </span>
               </span>
               {manquantes > 0 ? (
@@ -287,7 +287,7 @@ export function SaisieNotes() {
               ) : (
                 <span className="flex items-center gap-1.5 text-primary">
                   <CheckCircle2 className="size-4" />
-                  Saisie complÃ¨te
+                  Saisie complète
                 </span>
               )}
             </div>
@@ -298,9 +298,9 @@ export function SaisieNotes() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Ã‰lÃ¨ve</TableHead>
+                    <TableHead>Élève</TableHead>
                     <TableHead className="w-40">Note</TableHead>
-                    <TableHead className="text-center">BarÃ¨me</TableHead>
+                    <TableHead className="text-center">Barème</TableHead>
                     <TableHead className="text-center">Coef.</TableHead>
                     <TableHead>Statut</TableHead>
                   </TableRow>
@@ -366,7 +366,7 @@ export function SaisieNotes() {
                               variant="secondary"
                               className="border-transparent bg-primary/10 text-primary"
                             >
-                              ValidÃ©e
+                              Validée
                             </Badge>
                           ) : (
                             <Badge
@@ -389,10 +389,10 @@ export function SaisieNotes() {
             <div className="flex flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between md:px-6">
               <p className="text-xs text-muted-foreground">
                 {etat === 'valide'
-                  ? 'Notes validÃ©es : la modification est verrouillÃ©e.'
+                  ? 'Notes validées : la modification est verrouillée.'
                   : etat === 'enregistre'
-                    ? 'Brouillon enregistrÃ© (mode maquette, sans persistance).'
-                    : 'Mode maquette : la saisie nâ€™est pas encore persistÃ©e en base.'}
+                    ? 'Brouillon enregistré (mode maquette, sans persistance).'
+                    : 'Mode maquette : la saisie n’est pas encore persistée en base.'}
               </p>
               <div className="flex items-center gap-2">
                 {etat === 'valide' ? (

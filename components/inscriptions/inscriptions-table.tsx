@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -80,8 +80,8 @@ export function InscriptionsTable() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="tous">Tous les dossiers</SelectItem>
-              <SelectItem value="nouveau">Nouveaux Ã©lÃ¨ves</SelectItem>
-              <SelectItem value="inscrit">Anciens Ã©lÃ¨ves</SelectItem>
+              <SelectItem value="nouveau">Nouveaux élèves</SelectItem>
+              <SelectItem value="inscrit">Anciens élèves</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -94,8 +94,8 @@ export function InscriptionsTable() {
           <div className="rounded-lg border border-dashed">
             <EmptyState
               icon={UserPlus}
-              title="Aucune inscription trouvÃ©e"
-              description="Aucun dossier ne correspond Ã  votre recherche. Modifiez les filtres ou crÃ©ez une nouvelle inscription."
+              title="Aucune inscription trouvée"
+              description="Aucun dossier ne correspond à votre recherche. Modifiez les filtres ou créez une nouvelle inscription."
             />
           </div>
         ) : (
@@ -103,12 +103,12 @@ export function InscriptionsTable() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ã‰lÃ¨ve</TableHead>
+                  <TableHead>Élève</TableHead>
                   <TableHead>Matricule</TableHead>
                   <TableHead>Classe</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Dossier</TableHead>
-                  <TableHead className="text-right">Reste Ã  payer</TableHead>
+                  <TableHead className="text-right">Reste à payer</TableHead>
                   <TableHead>Paiement</TableHead>
                 </TableRow>
               </TableHeader>
@@ -129,7 +129,7 @@ export function InscriptionsTable() {
                         {e.matricule}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{classe?.nom ?? 'â€”'}</Badge>
+                        <Badge variant="outline">{classe?.nom ?? '—'}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {new Date(e.dateInscription).toLocaleDateString('fr-FR')}
@@ -143,7 +143,7 @@ export function InscriptionsTable() {
                             Nouveau
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">RÃ©inscription</Badge>
+                          <Badge variant="secondary">Réinscription</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
