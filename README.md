@@ -8,6 +8,9 @@ finances) pour établissements privés — construite avec **Next.js (App Router
 > réelles en base Supabase, sécurisées par la RLS selon le rôle connecté
 > (directeur, secrétariat, comptable, enseignant).
 
+> **Déploiement** : voir [`DEPLOIEMENT.md`](./DEPLOIEMENT.md) — checklist
+> Vercel étape par étape (2 variables d'environnement seulement).
+
 ---
 
 ## Fonctionnalités
