@@ -22,7 +22,7 @@ export default async function InscriptionsPage() {
   const anneeLibelle = options?.anneeCourante?.libelle ?? ''
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Inscriptions"
         description={
@@ -71,6 +71,6 @@ export default async function InscriptionsPage() {
         inscriptions={inscriptions}
         classes={options?.classes ?? []}
       />
-    </div>
+    </>
   )
 }
