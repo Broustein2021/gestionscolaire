@@ -16,33 +16,32 @@ function ConfirmInner() {
   const searchParams = useSearchParams()
   const supabase = createClient()
 
+  const tokenHash = searchParams.get('token_hash')
+  const type = searchParams.get('type') as
+    | 'signup'
+    | 'invite'
+    | 'magiclink'
+    | 'recovery'
+    | 'email_change'
+    | 'email'
+    | 'sms'
+    | 'phone'
+    | 'phone_change'
+    | null
+  const next = searchParams.get('next')
+  const hasCredentials = !!tokenHash && !!type
+
   const [status, setStatus] = useState<
     'confirmation' | 'erreur'
-  >('confirmation')
-  const [error, setError] = useState('')
+  >(hasCredentials ? 'confirmation' : 'erreur')
+  const [error, setError] = useState(
+    hasCredentials
+      ? ''
+      : 'Lien de confirmation invalide ou expiré.'
+  )
 
   useEffect(() => {
-    const tokenHash = searchParams.get('token_hash')
-    const type = searchParams.get('type') as
-      | 'signup'
-      | 'invite'
-      | 'magiclink'
-      | 'recovery'
-      | 'email_change'
-      | 'email'
-      | 'sms'
-      | 'phone'
-      | 'phone_change'
-      | null
-    const next = searchParams.get('next')
-
-    if (!tokenHash || !type) {
-      setStatus('erreur')
-      setError(
-        'Lien de confirmation invalide ou expiré.'
-      )
-      return
-    }
+    if (!hasCredentials) return
 
     const token = tokenHash
     const otpType = type
@@ -89,7 +88,7 @@ function ConfirmInner() {
     return () => {
       cancelled = true
     }
-  }, [searchParams, supabase, router])
+  }, [searchParams, supabase, router, hasCredentials, tokenHash, type, next])
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">

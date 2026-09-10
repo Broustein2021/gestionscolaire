@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
             <CardContent className="space-y-5">
               <p className="text-sm text-muted-foreground">
                 Si une adresse correspond à un compte, un lien de
-                réinitialisation vient d'être envoyé à{' '}
+                réinitialisation vient d’être envoyé à{' '}
                 <span className="font-medium text-foreground">
                   {email.trim()}
                 </span>

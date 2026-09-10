@@ -168,24 +168,32 @@ function NewPasswordForm({ email }: { email: string }) {
 }
 
 function ReinitialiserInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const [status, setStatus] = useState<Status>('traitement')
-  const [error, setError] = useState('')
+  const code = searchParams.get('code')
+  const tokenHash = searchParams.get('token_hash')
+  const type = searchParams.get('type')
+  const hasCredentials = !!code || !!(tokenHash && type)
+
+  const [status, setStatus] = useState<Status>(
+    hasCredentials ? 'traitement' : 'erreur'
+  )
+  const [error, setError] = useState(
+    hasCredentials
+      ? ''
+      : 'Lien invalide ou expiré : aucune information de réinitialisation fournie.'
+  )
   const [email, setEmail] = useState('')
 
   useEffect(() => {
+    if (!hasCredentials) return
+
     let cancelled = false
 
     async function exchange() {
-      const code = searchParams.get('code')
-      const tokenHash = searchParams.get('token_hash')
-      const type = searchParams.get('type')
-
       try {
-        const { data, error: sessionError } = code
+        const { error: sessionError } = code
           ? await supabase.auth.exchangeCodeForSession(code)
           : await supabase.auth.verifyOtp({
               token_hash: tokenHash ?? '',
@@ -241,7 +249,7 @@ function ReinitialiserInner() {
     return () => {
       cancelled = true
     }
-  }, [searchParams, supabase])
+  }, [searchParams, supabase, hasCredentials, code, tokenHash, type])
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
