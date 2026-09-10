@@ -58,19 +58,23 @@ CREATE TRIGGER trg_attendance_records_updated
   BEFORE UPDATE ON public.attendance_records
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP POLICY IF EXISTS attendance_records_select_member ON public.attendance_records;
 CREATE POLICY attendance_records_select_member ON public.attendance_records
   FOR SELECT TO authenticated
   USING (public.user_is_school_member(school_id));
 
+DROP POLICY IF EXISTS attendance_records_insert_authorized ON public.attendance_records;
 CREATE POLICY attendance_records_insert_authorized ON public.attendance_records
   FOR INSERT TO authenticated
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role, 'enseignant'::public.app_role]));
 
+DROP POLICY IF EXISTS attendance_records_update_authorized ON public.attendance_records;
 CREATE POLICY attendance_records_update_authorized ON public.attendance_records
   FOR UPDATE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role, 'enseignant'::public.app_role]))
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role, 'enseignant'::public.app_role]));
 
+DROP POLICY IF EXISTS attendance_records_delete_authorized ON public.attendance_records;
 CREATE POLICY attendance_records_delete_authorized ON public.attendance_records
   FOR DELETE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
@@ -100,16 +104,20 @@ CREATE TRIGGER trg_classrooms_updated
   BEFORE UPDATE ON public.classrooms
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP POLICY IF EXISTS classrooms_select_member ON public.classrooms;
 CREATE POLICY classrooms_select_member ON public.classrooms
   FOR SELECT TO authenticated
   USING (public.user_is_school_member(school_id));
+DROP POLICY IF EXISTS classrooms_insert_authorized ON public.classrooms;
 CREATE POLICY classrooms_insert_authorized ON public.classrooms
   FOR INSERT TO authenticated
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
+DROP POLICY IF EXISTS classrooms_update_authorized ON public.classrooms;
 CREATE POLICY classrooms_update_authorized ON public.classrooms
   FOR UPDATE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]))
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
+DROP POLICY IF EXISTS classrooms_delete_authorized ON public.classrooms;
 CREATE POLICY classrooms_delete_authorized ON public.classrooms
   FOR DELETE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
@@ -128,16 +136,20 @@ ALTER TABLE public.time_slots ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX IF NOT EXISTS idx_time_slots_school ON public.time_slots (school_id);
 
+DROP POLICY IF EXISTS time_slots_select_member ON public.time_slots;
 CREATE POLICY time_slots_select_member ON public.time_slots
   FOR SELECT TO authenticated
   USING (public.user_is_school_member(school_id));
+DROP POLICY IF EXISTS time_slots_insert_authorized ON public.time_slots;
 CREATE POLICY time_slots_insert_authorized ON public.time_slots
   FOR INSERT TO authenticated
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
+DROP POLICY IF EXISTS time_slots_update_authorized ON public.time_slots;
 CREATE POLICY time_slots_update_authorized ON public.time_slots
   FOR UPDATE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]))
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
+DROP POLICY IF EXISTS time_slots_delete_authorized ON public.time_slots;
 CREATE POLICY time_slots_delete_authorized ON public.time_slots
   FOR DELETE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
@@ -194,16 +206,20 @@ CREATE TRIGGER trg_timetable_entries_updated
   BEFORE UPDATE ON public.timetable_entries
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP POLICY IF EXISTS timetable_entries_select_member ON public.timetable_entries;
 CREATE POLICY timetable_entries_select_member ON public.timetable_entries
   FOR SELECT TO authenticated
   USING (public.user_is_school_member(school_id));
+DROP POLICY IF EXISTS timetable_entries_insert_authorized ON public.timetable_entries;
 CREATE POLICY timetable_entries_insert_authorized ON public.timetable_entries
   FOR INSERT TO authenticated
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role, 'enseignant'::public.app_role]));
+DROP POLICY IF EXISTS timetable_entries_update_authorized ON public.timetable_entries;
 CREATE POLICY timetable_entries_update_authorized ON public.timetable_entries
   FOR UPDATE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role, 'enseignant'::public.app_role]))
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role, 'enseignant'::public.app_role]));
+DROP POLICY IF EXISTS timetable_entries_delete_authorized ON public.timetable_entries;
 CREATE POLICY timetable_entries_delete_authorized ON public.timetable_entries
   FOR DELETE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
@@ -256,16 +272,20 @@ CREATE TRIGGER trg_incident_reports_updated
   BEFORE UPDATE ON public.incident_reports
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP POLICY IF EXISTS incident_reports_select_member ON public.incident_reports;
 CREATE POLICY incident_reports_select_member ON public.incident_reports
   FOR SELECT TO authenticated
   USING (public.user_is_school_member(school_id));
+DROP POLICY IF EXISTS incident_reports_insert_authorized ON public.incident_reports;
 CREATE POLICY incident_reports_insert_authorized ON public.incident_reports
   FOR INSERT TO authenticated
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role, 'enseignant'::public.app_role]));
+DROP POLICY IF EXISTS incident_reports_update_authorized ON public.incident_reports;
 CREATE POLICY incident_reports_update_authorized ON public.incident_reports
   FOR UPDATE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role]))
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role]));
+DROP POLICY IF EXISTS incident_reports_delete_authorized ON public.incident_reports;
 CREATE POLICY incident_reports_delete_authorized ON public.incident_reports
   FOR DELETE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
@@ -303,16 +323,20 @@ CREATE TRIGGER trg_announcements_updated
   BEFORE UPDATE ON public.announcements
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP POLICY IF EXISTS announcements_select_member ON public.announcements;
 CREATE POLICY announcements_select_member ON public.announcements
   FOR SELECT TO authenticated
   USING (public.user_is_school_member(school_id));
+DROP POLICY IF EXISTS announcements_insert_authorized ON public.announcements;
 CREATE POLICY announcements_insert_authorized ON public.announcements
   FOR INSERT TO authenticated
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role]));
+DROP POLICY IF EXISTS announcements_update_authorized ON public.announcements;
 CREATE POLICY announcements_update_authorized ON public.announcements
   FOR UPDATE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role]))
   WITH CHECK (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role, 'secretaire'::public.app_role]));
+DROP POLICY IF EXISTS announcements_delete_authorized ON public.announcements;
 CREATE POLICY announcements_delete_authorized ON public.announcements
   FOR DELETE TO authenticated
   USING (public.user_has_school_role(school_id, ARRAY['org_admin'::public.app_role, 'directeur'::public.app_role]));
