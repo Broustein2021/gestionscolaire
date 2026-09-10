@@ -76,6 +76,8 @@ export function AppShell({
   const isStandaloneRoute =
     pathname === "/login" ||
     pathname === "/inscription" ||
+    pathname === "/mot-de-passe-oublie" ||
+    pathname === "/reinitialiser" ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/onboarding")
 
