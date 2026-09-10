@@ -53,6 +53,8 @@ export async function updateSession(request: NextRequest) {
       '/login',
       '/inscription',
       '/auth',
+      '/mot-de-passe-oublie',
+      '/reinitialiser',
     ]
 
     const isPublicRoute = publicRoutes.some(
@@ -88,10 +90,6 @@ export async function updateSession(request: NextRequest) {
     .select('id, is_platform_admin')
     .eq('user_id', user.id)
     .maybeSingle()
-
-  console.log('[DEBUG proxy] user.id =', user.id)
-  console.log('[DEBUG proxy] profile =', profile)
-  console.log('[DEBUG proxy] profileError =', profileError)
 
   /*
    * ============================================================
@@ -149,10 +147,6 @@ export async function updateSession(request: NextRequest) {
       .select('id, school_id, role, status')
       .eq('profile_id', profile.id)
       .maybeSingle()
-
-  console.log('[DEBUG proxy] profile.id =', profile.id)
-  console.log('[DEBUG proxy] membership =', membership)
-  console.log('[DEBUG proxy] membershipError =', membershipError)
 
   /*
    * ============================================================
