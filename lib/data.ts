@@ -421,6 +421,12 @@ export const nav = [
     ],
   },
   {
+    group: 'Vie scolaire',
+    items: [
+      { href: '/assiduite', label: 'Présences & Absences', icon: 'calendarCheck' },
+    ],
+  },
+  {
     group: 'Finances',
     items: [{ href: '/finances', label: 'Frais & Paiements', icon: 'finance' }],
   },
