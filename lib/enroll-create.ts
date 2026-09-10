@@ -12,7 +12,6 @@ export type NouveauResponsableInput = {
 export type CreerInscriptionInput = {
   schoolId: string
   academicYearId: string
-  anneePrefixe: string
   classe: { id: string; levelLabel: string | null }
   eleve: {
     nom: string
@@ -47,26 +46,6 @@ export type ResultatInscription =
 
 const RLS =
   /row-level security|violates row level security|permission denied|new row violates/i
-
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>
-
-async function prochainMatricule(
-  supabase: SupabaseClient,
-  schoolId: string,
-  anneePrefixe: string,
-): Promise<string> {
-  const { data } = await supabase
-    .from('students')
-    .select('matricule')
-    .eq('school_id', schoolId)
-    .ilike('matricule', `ELV-${anneePrefixe}-%`)
-    .order('matricule', { ascending: false })
-    .limit(1)
-
-  const dernier = (Array.isArray(data) ? data[0]?.matricule : undefined) ?? ''
-  const numero = dernier ? Number(dernier.split('-').pop()) || 0 : 0
-  return `ELV-${anneePrefixe}-${String(numero + 1).padStart(3, '0')}`
-}
 
 function messageErreur(erreur: unknown, contexte: string): string {
   const msg = (erreur as { message?: string } | null)?.message ?? ''
@@ -110,12 +89,9 @@ export async function enregistrerInscription(
     input.montants.fraisInscription + input.montants.scolarite - input.montants.reduction,
   )
 
-  // --- 1. Élève (matricule auto, unique par école) ---
-  let matricule = await prochainMatricule(supabase, input.schoolId, input.anneePrefixe)
-
-  const builderEleve = (mat: string) => ({
+  // --- 1. Élève (matricule auto, unique par école, assigné par la base) ---
+  const builderEleve = {
     school_id: input.schoolId,
-    matricule: mat,
     last_name: input.eleve.nom.trim().toUpperCase(),
     first_name: input.eleve.prenoms.trim(),
     gender: input.eleve.sexe,
@@ -125,18 +101,13 @@ export async function enregistrerInscription(
     phone: input.eleve.telephone?.trim() || null,
     address: input.eleve.adresse?.trim() || null,
     status: input.eleve.statut,
-  })
-
-  const insererEleve = (mat: string) =>
-    supabase.from('students').insert(builderEleve(mat)).select('id, matricule').single()
-
-  let { data: student, error: errEleve } = await insererEleve(matricule)
-
-  // Conflit de matricule (unicité par école) : on recalcule une fois.
-  if (errEleve && String(errEleve.code) === '23505') {
-    matricule = await prochainMatricule(supabase, input.schoolId, input.anneePrefixe)
-    ;({ data: student, error: errEleve } = await insererEleve(matricule))
   }
+
+  const { data: student, error: errEleve } = await supabase
+    .from('students')
+    .insert(builderEleve)
+    .select('id, matricule')
+    .single()
 
   if (errEleve || !student) {
     return { ok: false, message: messageErreur(errEleve, "Création de l'élève") }
@@ -233,16 +204,9 @@ export async function enregistrerInscription(
         "Le dossier est créé, mais l'acompte n'a pas pu être encaissé (rôle sans droit de paiement).",
       )
     } else {
-      const { count } = await supabase
-        .from('receipts')
-        .select('id', { count: 'exact', head: true })
-        .eq('school_id', input.schoolId)
-
-      const numeroRecu = (count ?? 0) + 1
       const { error: errRecu } = await supabase.from('receipts').insert({
         school_id: input.schoolId,
         payment_id: payment.id,
-        receipt_number: `REC-${input.anneePrefixe}-${String(numeroRecu).padStart(5, '0')}`,
         balance_after: Math.max(0, montantAPayer - input.montants.acompte),
       })
 

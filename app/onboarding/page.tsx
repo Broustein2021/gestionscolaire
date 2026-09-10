@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { FormEvent, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -212,7 +212,7 @@ export default function OnboardingPage() {
 
           <p className="mt-2 text-sm text-slate-600">
             Quelques informations sont nécessaires avant
-            d'accéder à votre espace de gestion.
+            d’accéder à votre espace de gestion.
           </p>
         </div>
 
@@ -245,7 +245,7 @@ export default function OnboardingPage() {
                     htmlFor="organization"
                     className="mb-2 block text-sm font-medium text-slate-700"
                   >
-                    Nom de l'organisation *
+                    Nom de l’organisation *
                   </label>
 
                   <input
@@ -300,7 +300,7 @@ export default function OnboardingPage() {
                     htmlFor="school"
                     className="mb-2 block text-sm font-medium text-slate-700"
                   >
-                    Nom de l'établissement *
+                    Nom de l’établissement *
                   </label>
 
                   <input
@@ -343,7 +343,7 @@ export default function OnboardingPage() {
                     htmlFor="schoolType"
                     className="mb-2 block text-sm font-medium text-slate-700"
                   >
-                    Type d'établissement *
+                    Type d’établissement *
                   </label>
 
                   <select
@@ -371,7 +371,7 @@ export default function OnboardingPage() {
                     htmlFor="schoolEmail"
                     className="mb-2 block text-sm font-medium text-slate-700"
                   >
-                    Email de l'établissement
+                    Email de l’établissement
                   </label>
 
                   <input

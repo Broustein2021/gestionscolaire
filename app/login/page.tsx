@@ -214,7 +214,7 @@ export default function LoginPage() {
               </Button>
 
               <div className="text-center text-sm text-muted-foreground">
-                Vous n'avez pas encore de compte ?{' '}
+                Vous n’avez pas encore de compte ?{' '}
 
                 <Link
                   href="/inscription"

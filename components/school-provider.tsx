@@ -175,7 +175,8 @@ export function SchoolProvider({
   }, [supabase])
 
   useEffect(() => {
-    void loadSchoolContext()
+    const t = setTimeout(() => void loadSchoolContext(), 0)
+    return () => clearTimeout(t)
   }, [loadSchoolContext])
 
   const currentAcademicYear =

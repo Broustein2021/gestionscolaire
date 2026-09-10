@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
@@ -58,12 +59,15 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+          <div className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
             {school?.logo_url ? (
-              <img
+              <Image
                 src={school.logo_url}
                 alt=""
-                className="size-full object-cover"
+                fill
+                sizes="36px"
+                unoptimized
+                className="object-cover"
               />
             ) : (
               <Logo className="size-5" />

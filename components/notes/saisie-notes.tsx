@@ -109,18 +109,22 @@ export function SaisieNotes({
   // Chargement des notes réelles à chaque changement d'évaluation
   useEffect(() => {
     if (!evaluationId) {
-      setFeuille(null)
-      setNotes({})
-      setAbsents({})
-      setErreur(null)
-      setMessage(null)
+      queueMicrotask(() => {
+        setFeuille(null)
+        setNotes({})
+        setAbsents({})
+        setErreur(null)
+        setMessage(null)
+      })
       return
     }
     let actif = true
-    setChargement(true)
-    setErreur(null)
-    setMessage(null)
-    setEtat('brouillon')
+    queueMicrotask(() => {
+      setChargement(true)
+      setErreur(null)
+      setMessage(null)
+      setEtat('brouillon')
+    })
     chargerNotes(evaluationId).then((donnees) => {
       if (!actif) return
       setChargement(false)

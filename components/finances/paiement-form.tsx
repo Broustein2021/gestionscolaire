@@ -113,7 +113,6 @@ export function PaiementForm({
     const res = await enregistrerPaiement({
       schoolId: options.schoolId,
       academicYearId: options.academicYearId,
-      anneePrefixe: options.anneePrefixe,
       studentId: eleveId,
       feeCategoryId: categorieId || null,
       amount: valeur,

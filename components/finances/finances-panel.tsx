@@ -88,9 +88,10 @@ export function FinancesPanel({ data, options }: Props) {
   const [periode, setPeriode] = useState('Toute période')
 
   const kpis = data?.kpis
-  const paiements = data?.paiements ?? []
 
   const lignes = useMemo(() => {
+    const paiements = data?.paiements ?? []
+
     const term = q.trim().toLowerCase()
     return paiements
       .filter((l) => {
@@ -108,7 +109,7 @@ export function FinancesPanel({ data, options }: Props) {
         return matchTerm && matchStatut && matchMode && matchPeriode
       })
       .sort((a, b) => (a.date < b.date ? 1 : -1))
-  }, [paiements, q, statut, mode, periode])
+  }, [data?.paiements, q, statut, mode, periode])
 
   function versRecu(...argument: Parameters<typeof construireRecuData>) {
     setRecuData(construireRecuData(...argument))

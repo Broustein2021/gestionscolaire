@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { FormEvent, useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AlertCircle, Loader2, LockKeyhole, ShieldCheck } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
+import { validerMotDePasse } from '@/lib/password-policy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,10 +36,10 @@ function NewPasswordForm({ email }: { email: string }) {
 
     setError('')
 
-    if (password.length < 8) {
-      setError(
-        'Le mot de passe doit contenir au moins 8 caractères.'
-      )
+    const erreurMdp = validerMotDePasse(password)
+
+    if (erreurMdp) {
+      setError(erreurMdp)
       return
     }
 

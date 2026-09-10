@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 export type CreerPaiementInput = {
   schoolId: string
   academicYearId: string
-  anneePrefixe: string
   studentId: string
   feeCategoryId: string | null
   amount: number
@@ -114,25 +113,23 @@ export async function enregistrerPaiement(
     return { ok: false, message: messageErreur(errPayment, 'Enregistrement du paiement') }
   }
 
-  // --- 2. Reçu (numérotation séquentielle de l'école) ---
-  const { count } = await supabase
-    .from('receipts')
-    .select('id', { count: 'exact', head: true })
-    .eq('school_id', input.schoolId)
-
-  const numeroRecu = `REC-${input.anneePrefixe}-${String((count ?? 0) + 1).padStart(5, '0')}`
+  // --- 2. Reçu (numérotation séquentiale atomique par la base) ---
   const soldeRestant = Math.max(0, du - (payeAvant + input.amount))
 
-  const { error: errRecu } = await supabase.from('receipts').insert({
-    school_id: input.schoolId,
-    payment_id: payment.id,
-    receipt_number: numeroRecu,
-    balance_after: soldeRestant,
-  })
+  const { data: reçu, error: errRecu } = await supabase
+    .from('receipts')
+    .insert({
+      school_id: input.schoolId,
+      payment_id: payment.id,
+      balance_after: soldeRestant,
+    })
+    .select('receipt_number')
+    .single()
 
-  if (errRecu) {
+  if (errRecu || !reçu?.receipt_number) {
     console.error('[enregistrerPaiement] reçu non émis :', errRecu)
   }
+  const numeroRecu = reçu?.receipt_number ?? '—'
 
   return {
     ok: true,

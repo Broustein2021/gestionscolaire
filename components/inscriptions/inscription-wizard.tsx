@@ -206,9 +206,6 @@ export function InscriptionWizard({ options }: Props) {
     const res = await enregistrerInscription({
       schoolId: options.schoolId,
       academicYearId: options.academicYearId,
-      anneePrefixe: (
-        options.anneeCourante?.libelle ?? String(new Date().getFullYear())
-      ).slice(0, 4),
       classe: { id: classe.id, levelLabel: classe.level_label },
       eleve: {
         nom: form.nom.trim(),
