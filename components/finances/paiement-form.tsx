@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Loader2, Receipt } from 'lucide-react'
+import { AlertTriangle, Loader2, Receipt } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -150,7 +150,7 @@ export function PaiementForm({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="paiement-eleve">Élève</Label>
             <Select
               value={eleveId}
@@ -199,7 +199,7 @@ export function PaiementForm({
           ) : null}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="paiement-categorie">Catégorie de frais</Label>
               <Select
                 value={categorieId}
@@ -218,7 +218,7 @@ export function PaiementForm({
               </Select>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="paiement-montant">Montant encaissé (FCFA)</Label>
               <Input
                 id="paiement-montant"
@@ -234,7 +234,7 @@ export function PaiementForm({
               />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="paiement-date">Date du paiement</Label>
               <Input
                 id="paiement-date"
@@ -244,7 +244,7 @@ export function PaiementForm({
               />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="paiement-mode">Mode de paiement</Label>
               <Select
                 value={mode}
@@ -287,9 +287,10 @@ export function PaiementForm({
           </div>
 
           {erreur ? (
-            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {erreur}
-            </p>
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <span>{erreur}</span>
+            </div>
           ) : null}
         </div>
 

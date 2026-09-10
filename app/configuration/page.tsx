@@ -3,17 +3,28 @@
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
+  ArrowRight,
   Building2,
-  School,
+  Loader2,
+  Mail,
   MapPin,
   Phone,
-  Mail,
-  User,
-  Loader2,
-  ArrowRight,
+  School,
   ShieldCheck,
+  User,
 } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 
 const schoolTypes = [
@@ -23,6 +34,28 @@ const schoolTypes = [
   { value: 'lycee', label: 'Lycée' },
   { value: 'autre', label: 'Autre' },
 ]
+
+function Field({
+  label,
+  htmlFor,
+  required,
+  children,
+}: {
+  label: string
+  htmlFor?: string
+  required?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={htmlFor}>
+        {label}
+        {required ? <span className="text-destructive"> *</span> : null}
+      </Label>
+      {children}
+    </div>
+  )
+}
 
 export default function ConfigurationPage() {
   const router = useRouter()
@@ -44,10 +77,7 @@ export default function ConfigurationPage() {
     schoolEmail: '',
   })
 
-  function updateField(
-    field: keyof typeof form,
-    value: string
-  ) {
+  function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -161,38 +191,25 @@ export default function ConfigurationPage() {
                   </div>
 
                   <div>
-                    <h2 className="font-semibold">
-                      Organisation
-                    </h2>
+                    <h2 className="font-semibold">Organisation</h2>
                     <p className="text-sm text-muted-foreground">
                       Informations générales de votre structure.
                     </p>
                   </div>
                 </div>
 
-                <div className="grid gap-5">
-                  <div>
-                    <label
-                      htmlFor="organizationName"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Nom de l’organisation *
-                    </label>
-
-                    <input
+                <div className="grid gap-4">
+                  <Field label="Nom de l’organisation" htmlFor="organizationName" required>
+                    <Input
                       id="organizationName"
                       value={form.organizationName}
                       onChange={(e) =>
-                        updateField(
-                          'organizationName',
-                          e.target.value
-                        )
+                        updateField('organizationName', e.target.value)
                       }
                       placeholder="Ex. Groupe Scolaire Excellence"
-                      className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                       required
                     />
-                  </div>
+                  </Field>
                 </div>
               </section>
 
@@ -204,9 +221,7 @@ export default function ConfigurationPage() {
                   </div>
 
                   <div>
-                    <h2 className="font-semibold">
-                      Établissement
-                    </h2>
+                    <h2 className="font-semibold">Établissement</h2>
                     <p className="text-sm text-muted-foreground">
                       Informations qui apparaîtront dans votre espace
                       scolaire.
@@ -214,132 +229,83 @@ export default function ConfigurationPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-5 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label
-                      htmlFor="schoolName"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Nom de l’établissement *
-                    </label>
-
-                    <input
-                      id="schoolName"
-                      value={form.schoolName}
-                      onChange={(e) =>
-                        updateField('schoolName', e.target.value)
-                      }
-                      placeholder="Ex. Groupe Scolaire Excellence"
-                      className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                      required
-                    />
+                    <Field label="Nom de l’établissement" htmlFor="schoolName" required>
+                      <Input
+                        id="schoolName"
+                        value={form.schoolName}
+                        onChange={(e) =>
+                          updateField('schoolName', e.target.value)
+                        }
+                        placeholder="Ex. Groupe Scolaire Excellence"
+                        required
+                      />
+                    </Field>
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="shortName"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Nom court
-                    </label>
-
-                    <input
+                  <Field label="Nom court" htmlFor="shortName">
+                    <Input
                       id="shortName"
                       value={form.shortName}
                       onChange={(e) =>
                         updateField('shortName', e.target.value)
                       }
                       placeholder="Ex. GSE"
-                      className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                     />
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label
-                      htmlFor="schoolType"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Type d’établissement *
-                    </label>
-
-                    <select
-                      id="schoolType"
+                  <Field label="Type d’établissement" htmlFor="schoolType" required>
+                    <Select
                       value={form.schoolType}
-                      onChange={(e) =>
-                        updateField('schoolType', e.target.value)
+                      onValueChange={(v) =>
+                        updateField('schoolType', v ?? 'primaire_secondaire')
                       }
-                      className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                     >
-                      {schoolTypes.map((type) => (
-                        <option
-                          key={type.value}
-                          value={type.value}
-                        >
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <SelectTrigger id="schoolType">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {schoolTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
 
-                  <div>
-                    <label
-                      htmlFor="city"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Ville
-                    </label>
-
-                    <input
+                  <Field label="Ville" htmlFor="city">
+                    <Input
                       id="city"
                       value={form.city}
-                      onChange={(e) =>
-                        updateField('city', e.target.value)
-                      }
+                      onChange={(e) => updateField('city', e.target.value)}
                       placeholder="Ex. Abidjan"
-                      className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                     />
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label
-                      htmlFor="commune"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Commune
-                    </label>
-
-                    <input
+                  <Field label="Commune" htmlFor="commune">
+                    <Input
                       id="commune"
                       value={form.commune}
-                      onChange={(e) =>
-                        updateField('commune', e.target.value)
-                      }
+                      onChange={(e) => updateField('commune', e.target.value)}
                       placeholder="Ex. Cocody"
-                      className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                     />
-                  </div>
+                  </Field>
 
                   <div className="sm:col-span-2">
-                    <label
-                      htmlFor="address"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Adresse
-                    </label>
-
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-3 size-4 text-muted-foreground" />
-
-                      <input
-                        id="address"
-                        value={form.address}
-                        onChange={(e) =>
-                          updateField('address', e.target.value)
-                        }
-                        placeholder="Adresse complète"
-                        className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                      />
-                    </div>
+                    <Field label="Adresse" htmlFor="address">
+                      <div className="relative">
+                        <MapPin className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id="address"
+                          value={form.address}
+                          onChange={(e) => updateField('address', e.target.value)}
+                          placeholder="Adresse complète"
+                          className="pl-8"
+                        />
+                      </div>
+                    </Field>
                   </div>
                 </div>
               </section>
@@ -352,66 +318,43 @@ export default function ConfigurationPage() {
                   </div>
 
                   <div>
-                    <h2 className="font-semibold">
-                      Coordonnées
-                    </h2>
+                    <h2 className="font-semibold">Coordonnées</h2>
                     <p className="text-sm text-muted-foreground">
                       Informations de contact de l’établissement.
                     </p>
                   </div>
                 </div>
 
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="phone"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Téléphone
-                    </label>
-
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Téléphone" htmlFor="phone">
                     <div className="relative">
-                      <Phone className="absolute left-3 top-3 size-4 text-muted-foreground" />
-
-                      <input
+                      <Phone className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
                         id="phone"
                         type="tel"
                         value={form.phone}
-                        onChange={(e) =>
-                          updateField('phone', e.target.value)
-                        }
+                        onChange={(e) => updateField('phone', e.target.value)}
                         placeholder="+225 07 00 00 00 00"
-                        className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="pl-8"
                       />
                     </div>
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label
-                      htmlFor="schoolEmail"
-                      className="mb-2 block text-sm font-medium"
-                    >
-                      Email de l’établissement
-                    </label>
-
+                  <Field label="Email de l’établissement" htmlFor="schoolEmail">
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 size-4 text-muted-foreground" />
-
-                      <input
+                      <Mail className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
                         id="schoolEmail"
                         type="email"
                         value={form.schoolEmail}
                         onChange={(e) =>
-                          updateField(
-                            'schoolEmail',
-                            e.target.value
-                          )
+                          updateField('schoolEmail', e.target.value)
                         }
                         placeholder="contact@ecole.ci"
-                        className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="pl-8"
                       />
                     </div>
-                  </div>
+                  </Field>
                 </div>
               </section>
             </div>
@@ -423,9 +366,7 @@ export default function ConfigurationPage() {
                   <User className="size-5" />
                 </div>
 
-                <h2 className="font-semibold">
-                  Administrateur
-                </h2>
+                <h2 className="font-semibold">Administrateur</h2>
 
                 <p className="mt-1 text-sm text-muted-foreground">
                   Ces informations seront associées à votre compte
@@ -433,23 +374,15 @@ export default function ConfigurationPage() {
                 </p>
 
                 <div className="mt-5">
-                  <label
-                    htmlFor="fullName"
-                    className="mb-2 block text-sm font-medium"
-                  >
-                    Nom complet *
-                  </label>
-
-                  <input
-                    id="fullName"
-                    value={form.fullName}
-                    onChange={(e) =>
-                      updateField('fullName', e.target.value)
-                    }
-                    placeholder="Jean Marie BROU"
-                    className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    required
-                  />
+                  <Field label="Nom complet" htmlFor="fullName" required>
+                    <Input
+                      id="fullName"
+                      value={form.fullName}
+                      onChange={(e) => updateField('fullName', e.target.value)}
+                      placeholder="Jean Marie BROU"
+                      required
+                    />
+                  </Field>
                 </div>
               </section>
 
@@ -458,9 +391,7 @@ export default function ConfigurationPage() {
                   <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
 
                   <div>
-                    <h3 className="font-semibold">
-                      Votre espace est sécurisé
-                    </h3>
+                    <h3 className="font-semibold">Votre espace est sécurisé</h3>
 
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       Vous serez automatiquement enregistré comme
@@ -470,29 +401,30 @@ export default function ConfigurationPage() {
                 </div>
               </section>
 
-              {error && (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                  {error}
+              {error ? (
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span>{error}</span>
                 </div>
-              )}
+              ) : null}
 
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full"
               >
                 {loading ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
                     Création en cours...
                   </>
                 ) : (
                   <>
                     Créer mon établissement
-                    <ArrowRight className="size-4" />
+                    <ArrowRight className="size-4" data-icon="inline-end" />
                   </>
                 )}
-              </button>
+              </Button>
             </aside>
           </div>
         </form>
