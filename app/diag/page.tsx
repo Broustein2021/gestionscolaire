@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentSchoolContext } from '@/lib/queries/school-context'
 import { getEvaluationOptions } from '@/lib/queries/grades'
@@ -12,32 +13,34 @@ export default async function DiagPage() {
     error: authError,
   } = await supabase.auth.getUser()
 
+  const authMessage = authError?.message ?? null
+
+  if (!user) notFound()
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, is_platform_admin')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (profileError || !profile?.is_platform_admin) notFound()
+
   const stages: Record<string, unknown> = {
-    authError: authError?.message ?? null,
+    authError: authMessage,
     user: user ? { id: user.id, email: user.email } : null,
   }
 
-  if (user) {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, is_platform_admin')
-      .eq('user_id', user.id)
-      .maybeSingle()
+  stages.profileError = null
+  stages.profile = profile
 
-    stages.profileError = profileError?.message ?? null
-    stages.profile = profile
+  const { data: membership, error: membershipError } = await supabase
+    .from('school_members')
+    .select('id, school_id, role, status')
+    .eq('profile_id', profile.id)
+    .maybeSingle()
 
-    if (profile) {
-      const { data: membership, error: membershipError } = await supabase
-        .from('school_members')
-        .select('id, school_id, role, status')
-        .eq('profile_id', profile.id)
-        .maybeSingle()
-
-      stages.membershipError = membershipError?.message ?? null
-      stages.membership = membership
-    }
-  }
+  stages.membershipError = membershipError?.message ?? null
+  stages.membership = membership
 
   const ctx = await getCurrentSchoolContext()
   stages.contexte = ctx

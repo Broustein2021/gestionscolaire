@@ -11,12 +11,20 @@ function dateDuJour(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default async function AssiduitePage() {
+export default async function AssiduitePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ classe?: string }>
+}) {
+  const { classe } = await searchParams
   const ctx = await getAssiduiteContext()
 
   if (!ctx) {
     return null
   }
+
+  const classeInitiale =
+    classe && ctx.classes.some((c) => c.id === classe) ? classe : undefined
 
   const effectifTotal = ctx.classes.reduce((s, c) => s + c.effectif, 0)
   const classesAvecEleves = ctx.classes.filter((c) => c.effectif > 0).length
@@ -57,6 +65,7 @@ export default async function AssiduitePage() {
         schoolId={ctx.schoolId}
         academicYearId={ctx.academicYearId}
         dateInitiale={dateDuJour()}
+        classeInitiale={classeInitiale}
       />
     </>
   )

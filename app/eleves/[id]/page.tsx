@@ -33,6 +33,8 @@ import {
 } from '@/components/ui/table'
 import { formatFCFA } from '@/lib/data'
 import { getEleveDetail } from '@/lib/queries/eleves'
+import { getCurrentUserRole } from '@/lib/queries/school-context'
+import { EleveEditDialog } from '@/components/eleves/eleve-dialog'
 
 function Info({ icon: Icon, label, value }: { icon: typeof Phone; label: string; value: string }) {
   return (
@@ -54,6 +56,10 @@ export default async function FicheElevePage({
   const { id } = await params
   const eleve = await getEleveDetail(id)
   if (!eleve) notFound()
+
+  const role = await getCurrentUserRole()
+  const peutModifier =
+    role === 'super_admin' || role === 'org_admin' || role === 'directeur'
 
   const tauxPaiement = eleve.montantDu > 0 ? Math.round((eleve.montantPaye / eleve.montantDu) * 100) : 0
 
@@ -94,14 +100,32 @@ export default async function FicheElevePage({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline">
-              <FileText className="size-4" data-icon="inline-start" />
-              Bulletin
-            </Button>
-            <Button>
-              <Pencil className="size-4" data-icon="inline-start" />
-              Modifier
-            </Button>
+            {eleve.classeId ? (
+              <LinkButton href={`/bulletins?classe=${eleve.classeId}&eleve=${eleve.id}`} variant="outline">
+                <FileText className="size-4" data-icon="inline-start" />
+                Bulletin
+              </LinkButton>
+            ) : (
+              <Button
+                variant="outline"
+                disabled
+                title="Affectez d'abord l'élève à une classe pour générer son bulletin."
+              >
+                <FileText className="size-4" data-icon="inline-start" />
+                Bulletin
+              </Button>
+            )}
+            {peutModifier ? (
+              <EleveEditDialog
+                eleve={eleve}
+                trigger={
+                  <Button>
+                    <Pencil className="size-4" data-icon="inline-start" />
+                    Modifier
+                  </Button>
+                }
+              />
+            ) : null}
           </div>
         </CardContent>
       </Card>

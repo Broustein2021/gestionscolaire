@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Search, ChevronRight } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -131,7 +132,22 @@ export function ElevesTable({ eleves, niveaux }: { eleves: Eleve[]; niveaux: str
                     </TableCell>
                     <TableCell className="font-mono text-xs">{e.matricule}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{e.classeNom ?? '—'}</Badge>
+                      {e.classeId ? (
+                        <Link
+                          href={`/classes/${e.classeId}`}
+                          onClick={(ev) => ev.stopPropagation()}
+                          className="inline-flex"
+                        >
+                          <Badge
+                            variant="outline"
+                            className="cursor-pointer transition-colors hover:border-primary hover:text-primary"
+                          >
+                            {e.classeNom ?? '—'}
+                          </Badge>
+                        </Link>
+                      ) : (
+                        <Badge variant="outline">{e.classeNom ?? '—'}</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="tabular-nums">
                       {e.moyenne > 0 ? `${e.moyenne.toFixed(2)}/20` : '—'}

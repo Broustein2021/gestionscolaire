@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
@@ -71,14 +71,16 @@ export function AssiduitePanel({
   schoolId,
   academicYearId,
   dateInitiale,
+  classeInitiale,
 }: {
   classes: ClassePresence[]
   schoolId: string
   academicYearId: string
   dateInitiale: string
+  classeInitiale?: string
 }) {
   const router = useRouter()
-  const [classeId, setClasseId] = useState('')
+  const [classeId, setClasseId] = useState(classeInitiale ?? '')
   const [date, setDate] = useState(dateInitiale)
   const [lignes, setLignes] = useState<Ligne[]>([])
   const [chargement, setChargement] = useState(false)
@@ -185,6 +187,14 @@ export function AssiduitePanel({
     },
     [schoolId, academicYearId],
   )
+
+  useEffect(() => {
+    if (!classeInitiale) return
+    const timer = window.setTimeout(() => {
+      void chargerFeuille(classeInitiale, dateInitiale)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [classeInitiale, dateInitiale, chargerFeuille])
 
   function onClasseChange(value: string | null) {
     const classId = value ?? ''

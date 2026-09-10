@@ -65,3 +65,37 @@ export async function getCurrentSchoolContext(): Promise<SchoolContext | null> {
 
   return { schoolId: membership.school_id, academicYearId }
 }
+
+/**
+ * Rôle de l'utilisateur dans son établissement actif (pour gate les actions
+ * réservées à la direction : modifier un élève, une classe, etc.).
+ * Retourne null si aucun établissement actif.
+ */
+export async function getCurrentUserRole(): Promise<string | null> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return null
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!profile) return null
+
+  const { data: membership } = await supabase
+    .from('school_members')
+    .select('role')
+    .eq('profile_id', profile.id)
+    .eq('status', 'active')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  return membership?.role ?? null
+}

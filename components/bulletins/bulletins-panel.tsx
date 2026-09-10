@@ -43,21 +43,34 @@ export function BulletinsPanel({
   periodeLabel,
   selectedClasseId,
   selectedTermId,
+  selectedStudentId,
 }: {
   options: EvaluationOptions | null
   rows: BulletinRow[]
   periodeLabel: string | null
   selectedClasseId: string | null
   selectedTermId: string | null
+  selectedStudentId: string | null
 }) {
   const router = useRouter()
-  const [q, setQ] = useState('')
-  const [apercuId, setApercuId] = useState<string | null>(null)
+  const [q, setQ] = useState(() => {
+    if (!selectedStudentId) return ''
+    const cible = rows.find((r) => r.studentId === selectedStudentId)
+    return cible ? cible.nom + ' ' + cible.prenoms : ''
+  })
+  const [apercuId, setApercuId] = useState<string | null>(() => {
+    const cible = selectedStudentId ? rows.find((r) => r.studentId === selectedStudentId) : null
+    return cible && cible.moyenne > 0 ? selectedStudentId : null
+  })
   const [valides, setValides] = useState<string[]>([])
 
   const classes = options?.classes ?? []
   const termes = options?.termes ?? []
   const classe = classes.find((c) => c.id === selectedClasseId)
+
+  const studentCible = selectedStudentId
+    ? (rows.find((r) => r.studentId === selectedStudentId) ?? null)
+    : null
 
   const filteres = useMemo(() => {
     const term = q.trim().toLowerCase()
@@ -100,6 +113,8 @@ export function BulletinsPanel({
               value={selectedClasseId ?? ''}
               onValueChange={(v) => {
                 const classeId = v as string
+                setApercuId(null)
+                setQ('')
                 router.push(`/bulletins?classe=${classeId}&periode=${selectedTermId ?? ''}`)
               }}
             >
@@ -118,6 +133,8 @@ export function BulletinsPanel({
               value={selectedTermId ?? ''}
               onValueChange={(v) => {
                 const termId = v as string
+                setApercuId(null)
+                setQ('')
                 router.push(`/bulletins?classe=${selectedClasseId ?? ''}&periode=${termId}`)
               }}
             >
@@ -152,6 +169,32 @@ export function BulletinsPanel({
               Valider la classe
             </Button>
           </div>
+
+          {selectedStudentId ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+              <span className="flex items-center gap-2">
+                <FileText className="size-4 text-muted-foreground" />
+                Bulletin consulté pour{' '}
+                <span className="font-medium">
+                  {studentCible ? `${studentCible.nom} ${studentCible.prenoms}` : 'cet élève'}
+                </span>
+                {classe ? <span className="text-muted-foreground">— {classe.nom}</span> : null}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setApercuId(null)
+                  setQ('')
+                  router.push(
+                    `/bulletins?classe=${selectedClasseId ?? ''}&periode=${selectedTermId ?? ''}`,
+                  )
+                }}
+              >
+                Voir la classe entière
+              </Button>
+            </div>
+          ) : null}
 
           {rows.length === 0 ? (
             <div className="rounded-lg border border-dashed">

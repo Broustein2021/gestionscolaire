@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, BookOpen, DoorOpen, Gauge, Users } from 'lucide-react'
+import { ArrowLeft, BookOpen, CalendarCheck, DoorOpen, Gauge, Users } from 'lucide-react'
 
 import { LinkButton } from '@/components/link-button'
 import { PaymentBadge } from '@/components/payment-badge'
@@ -62,25 +62,31 @@ export default async function FicheClassePage({
               </Badge>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-lg border p-3">
-            <Avatar className="size-10">
-              <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-                {classe.profPrincipalNom
-                  ? classe.profPrincipalNom
-                      .split(' ')
-                      .map((p) => p[0])
-                      .join('')
-                      .slice(0, 2)
-                      .toUpperCase()
-                  : '—'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Professeur principal</span>
-              <span className="text-sm font-medium">
-                {classe.profPrincipalNom ?? 'Non affecté'}
-              </span>
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <Avatar className="size-10">
+                <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
+                  {classe.profPrincipalNom
+                    ? classe.profPrincipalNom
+                        .split(' ')
+                        .map((p) => p[0])
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase()
+                    : '—'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">Professeur principal</span>
+                <span className="text-sm font-medium">
+                  {classe.profPrincipalNom ?? 'Non affecté'}
+                </span>
+              </div>
             </div>
+            <LinkButton href={`/assiduite?classe=${classe.id}`} variant="outline">
+              <CalendarCheck className="size-4" data-icon="inline-start" />
+              Pointer la présence
+            </LinkButton>
           </div>
         </CardContent>
       </Card>

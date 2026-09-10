@@ -15,6 +15,7 @@ import {
   FileText,
   Wallet,
   CalendarCheck,
+  Settings,
   GraduationCap as Logo,
 } from "lucide-react"
 
@@ -46,6 +47,7 @@ const iconMap = {
   reports: FileText,
   finance: Wallet,
   calendarCheck: CalendarCheck,
+  settings: Settings,
 } as const
 
 export function AppSidebar() {

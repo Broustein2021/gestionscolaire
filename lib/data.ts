@@ -430,4 +430,8 @@ export const nav = [
     group: 'Finances',
     items: [{ href: '/finances', label: 'Frais & Paiements', icon: 'finance' }],
   },
+  {
+    group: 'Paramètres',
+    items: [{ href: '/configuration', label: 'Configuration', icon: 'settings' }],
+  },
 ] as const

@@ -10,9 +10,9 @@ export const metadata = { title: 'Bulletins — GESTION-SCOLAIRE' }
 export default async function BulletinsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ classe?: string; periode?: string }>
+  searchParams: Promise<{ classe?: string; periode?: string; eleve?: string }>
 }) {
-  const { classe, periode } = await searchParams
+  const { classe, periode, eleve } = await searchParams
   const options = await getEvaluationOptions()
 
   const classId =
@@ -70,6 +70,7 @@ export default async function BulletinsPage({
         periodeLabel={bulletins?.periodeLabel ?? null}
         selectedClasseId={classId}
         selectedTermId={termId}
+        selectedStudentId={eleve ?? null}
       />
     </>
   )

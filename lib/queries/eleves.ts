@@ -11,6 +11,7 @@ export type Eleve = {
   sexe: 'M' | 'F'
   nationalite: string
   classeNom: string | null
+  classeId: string | null
   niveau: string | null
   moyenne: number
   statutPaiement: StatutPaiement
@@ -33,6 +34,7 @@ export async function getEleves(): Promise<Eleve[]> {
       `
       payment_status,
       level_label,
+      class_id,
       students:student_id ( id, first_name, last_name, matricule, gender, nationality, status ),
       classes:class_id ( name )
     `,
@@ -67,6 +69,7 @@ export async function getEleves(): Promise<Eleve[]> {
         sexe: s.gender,
         nationalite: s.nationality ?? '—',
         classeNom: c?.name ?? null,
+        classeId: r.class_id ?? null,
         niveau: r.level_label,
         moyenne: moyennes.get(s.id) ?? 0,
         statutPaiement: r.payment_status,
@@ -107,6 +110,7 @@ export type EleveNote = {
 
 export type EleveDetail = {
   id: string
+  schoolId: string
   nom: string
   prenoms: string
   matricule: string
@@ -118,6 +122,7 @@ export type EleveDetail = {
   adresse: string | null
   statut: string
   classeNom: string | null
+  classeId: string | null
   niveau: string | null
   dateInscription: string | null
   montantDu: number
@@ -155,7 +160,7 @@ export async function getEleveDetail(studentId: string): Promise<EleveDetail | n
     await Promise.all([
       supabase
         .from('enrollments')
-        .select('amount_due, amount_paid, payment_status, enrolled_on, level_label, classes:class_id ( name )')
+        .select('amount_due, amount_paid, payment_status, enrolled_on, level_label, class_id, classes:class_id ( name )')
         .eq('student_id', studentId)
         .eq('school_id', ctx.schoolId)
         .eq('academic_year_id', ctx.academicYearId)
@@ -238,6 +243,7 @@ export async function getEleveDetail(studentId: string): Promise<EleveDetail | n
 
   return {
     id: student.id,
+    schoolId: ctx.schoolId,
     nom: student.last_name,
     prenoms: student.first_name,
     matricule: student.matricule,
@@ -249,6 +255,7 @@ export async function getEleveDetail(studentId: string): Promise<EleveDetail | n
     adresse: student.address,
     statut: student.status,
     classeNom: classe?.name ?? null,
+    classeId: enrollment?.class_id ?? null,
     niveau: enrollment?.level_label ?? null,
     dateInscription: enrollment?.enrolled_on ?? null,
     montantDu: enrollment ? Number(enrollment.amount_due) : 0,
