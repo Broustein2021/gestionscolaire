@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -45,7 +45,7 @@ import { PaymentBadge } from '@/components/payment-badge'
 import { StatCard } from '@/components/stat-card'
 import { PaiementForm } from '@/components/finances/paiement-form'
 import { RecuDocument, type RecuData } from '@/components/finances/recu-document'
-import { formatFCFA, modesPaiement } from '@/lib/data'
+import { formatDateFR, formatFCFA, modesPaiement } from '@/lib/data'
 import type { PaiementEnregistre } from '@/lib/payments-create'
 import type { FinancesData, FinancesOptions } from '@/lib/queries/finances'
 
@@ -324,7 +324,9 @@ export function FinancesPanel({ data, options }: Props) {
                           '—'
                         )}
                       </TableCell>
-                      <TableCell className="tabular-nums">{l.date}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatDateFR(l.date)}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {l.motif ?? '—'}
                       </TableCell>

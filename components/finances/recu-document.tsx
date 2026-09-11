@@ -1,6 +1,6 @@
-import { GraduationCap } from 'lucide-react'
+﻿import { GraduationCap } from 'lucide-react'
 
-import { formatFCFA } from '@/lib/data'
+import { formatDateFR, formatFCFA } from '@/lib/data'
 import type { EtablissementInfo } from '@/lib/queries/finances'
 
 export type RecuData = {
@@ -69,7 +69,7 @@ export function RecuDocument({ data }: { data: RecuData }) {
         </div>
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">Date</dt>
-          <dd className="tabular-nums">{data.date}</dd>
+          <dd className="tabular-nums">{formatDateFR(data.date)}</dd>
         </div>
       </dl>
 

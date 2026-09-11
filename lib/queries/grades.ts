@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { getCurrentSchoolContext } from '@/lib/queries/school-context'
 import { getClasses } from '@/lib/queries/classes'
 import { getEnseignantsData } from '@/lib/queries/enseignants'

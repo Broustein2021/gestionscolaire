@@ -207,6 +207,13 @@ export function formatFCFA(montant: number): string {
   return new Intl.NumberFormat('fr-FR').format(montant) + ' FCFA'
 }
 
+export function formatDateFR(date: string | null | undefined): string {
+  if (!date) return '—'
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('fr-FR')
+}
+
 export function getClasse(id: string) {
   return classes.find((c) => c.id === id)
 }
