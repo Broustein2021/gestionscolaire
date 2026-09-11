@@ -454,6 +454,27 @@ export async function getBulletins(
     for (const m of matiereRows ?? []) nomParMatiere.set(m.id, m.name)
   }
 
+  // Noms des enseignants utilisés (une seule requête)
+  const enseignantsUtilises = new Set<string>()
+  for (const a of assessmentRows ?? []) {
+    if (a.teacher_id) enseignantsUtilises.add(a.teacher_id)
+  }
+  const nomParEnseignant = new Map<string, string>()
+  if (enseignantsUtilises.size > 0) {
+    const { data: enseignantRows } = await supabase
+      .from('teachers')
+      .select('id, first_name, last_name')
+      .eq('school_id', ctx.schoolId)
+      .in('id', Array.from(enseignantsUtilises))
+    for (const t of enseignantRows ?? []) {
+      nomParEnseignant.set(
+        t.id,
+        [t.first_name, t.last_name].filter(Boolean).join(' ').trim() ||
+          '—',
+      )
+    }
+  }
+
   // Bulletins détaillés (par matière), calculés en mémoire
   const results: BulletinRow[] = students.map((stu) => {
     const moyenne = moyennes.get(stu.id) ?? 0
@@ -482,7 +503,7 @@ export async function getBulletins(
           coefficient: acc.coef,
           points: note * acc.coef,
           appreciation: appreciationNote(note),
-          enseignant: acc.enseignant,
+          enseignant: nomParEnseignant.get(acc.enseignant ?? '') ?? '—',
         }
       })
       .filter((l) => l.matiere !== '—')
