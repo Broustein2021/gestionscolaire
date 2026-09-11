@@ -93,7 +93,7 @@ export function Topbar() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="relative hidden lg:block">
+        <div className="relative hidden xl:block">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
           <input
@@ -143,7 +143,7 @@ export function Topbar() {
             </AvatarFallback>
           </Avatar>
 
-          <div className="hidden flex-col leading-tight sm:flex">
+          <div className="hidden flex-col leading-tight lg:flex">
             <span
               className="max-w-[180px] truncate text-sm font-medium"
               title={email}
