@@ -111,6 +111,9 @@ export function BulletinsPanel({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <Select
               value={selectedClasseId ?? ''}
+              items={Object.fromEntries(
+                classes.map((c) => [String(c.id), `${c.nom} — ${c.cycle}`])
+              )}
               onValueChange={(v) => {
                 const classeId = v as string
                 setApercuId(null)
@@ -131,6 +134,12 @@ export function BulletinsPanel({
             </Select>
             <Select
               value={selectedTermId ?? ''}
+              items={Object.fromEntries(
+                termes.map((t) => [
+                  String(t.id),
+                  `${t.label}${t.estCourant ? ' (en cours)' : ''}`,
+                ])
+              )}
               onValueChange={(v) => {
                 const termId = v as string
                 setApercuId(null)

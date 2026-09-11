@@ -66,7 +66,11 @@ export function InscriptionsTable({ inscriptions, classes }: Props) {
               aria-label="Rechercher une inscription"
             />
           </div>
-          <Select value={classeId} onValueChange={(value) => setClasseId(value ?? '')}>
+          <Select
+            value={classeId}
+            items={Object.fromEntries(classes.map((c) => [String(c.id), c.nom]))}
+            onValueChange={(value) => setClasseId(value ?? '')}
+          >
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="Classe" />
             </SelectTrigger>

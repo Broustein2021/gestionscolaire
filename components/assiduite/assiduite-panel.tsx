@@ -290,7 +290,13 @@ export function AssiduitePanel({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
             <div className="flex flex-col gap-1.5 sm:min-w-56">
               <Label htmlFor="ass-classe">Classe</Label>
-              <Select value={classeId || undefined} onValueChange={onClasseChange}>
+              <Select
+                value={classeId || undefined}
+                items={Object.fromEntries(
+                  classes.map((c) => [String(c.id), `${c.nom} ${c.niveau ?? ''}`.trim()])
+                )}
+                onValueChange={onClasseChange}
+              >
                 <SelectTrigger id="ass-classe" className="w-full">
                   <SelectValue placeholder={aPlusieurs ? 'Choisir une classe' : classes[0]?.nom ?? 'Aucune classe'} />
                 </SelectTrigger>

@@ -103,7 +103,12 @@ export function Topbar() {
           />
         </div>
 
-        <Select defaultValue={currentAcademicYear?.id}>
+        <Select
+          defaultValue={currentAcademicYear?.id}
+          items={Object.fromEntries(
+            academicYears.map((y) => [String(y.id), y.label])
+          )}
+        >
           <SelectTrigger className="h-9 w-[150px]" size="sm">
             <SelectValue placeholder="Année scolaire" />
           </SelectTrigger>

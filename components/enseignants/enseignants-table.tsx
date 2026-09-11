@@ -185,6 +185,7 @@ export function EnseignantDialog({
                 <Label htmlFor="t-sexe">Sexe</Label>
                 <Select
                   value={sexe}
+                  items={{ M: 'Masculin', F: 'Féminin' }}
                   onValueChange={(v) => setSexe(v === 'F' ? 'F' : 'M')}
                   disabled={champsDesactives}
                 >
@@ -239,6 +240,9 @@ export function EnseignantDialog({
                       <Label htmlFor="t-matiere">Matière</Label>
                       <Select
                         value={matiereId}
+                        items={Object.fromEntries(
+                          (options?.matieres ?? []).map((m) => [String(m.id), m.nom])
+                        )}
                         onValueChange={(v) => setMatiereId(v ?? AUCUNE)}
                         disabled={etat === 'envoi'}
                       >
@@ -259,6 +263,9 @@ export function EnseignantDialog({
                       <Label htmlFor="t-classe">Classe</Label>
                       <Select
                         value={classeId}
+                        items={Object.fromEntries(
+                          (options?.classes ?? []).map((c) => [String(c.id), c.nom])
+                        )}
                         onValueChange={(v) => setClasseId(v ?? AUCUNE)}
                         disabled={etat === 'envoi'}
                       >
@@ -396,7 +403,11 @@ export function EnseignantsTable({
               aria-label="Rechercher un enseignant"
             />
           </div>
-          <Select value={matiereId} onValueChange={(value) => setMatiereId(value ?? '')}>
+          <Select
+            value={matiereId}
+            items={Object.fromEntries(matieres.map((m) => [String(m.id), m.nom]))}
+            onValueChange={(value) => setMatiereId(value ?? '')}
+          >
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Matière" />
             </SelectTrigger>

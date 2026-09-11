@@ -212,6 +212,12 @@ export function SaisieNotes({
             <Label htmlFor="n-periode">Période</Label>
             <Select
               value={periodeId}
+              items={Object.fromEntries(
+                termes.map((t) => [
+                  String(t.id),
+                  `${t.label}${t.estCourant ? ' (en cours)' : ''}`,
+                ])
+              )}
               onValueChange={(v) => {
                 setPeriodeId((v as string) ?? '')
                 setEvaluationId('')
@@ -234,6 +240,7 @@ export function SaisieNotes({
             <Label htmlFor="n-classe">Classe</Label>
             <Select
               value={classeId}
+              items={Object.fromEntries(classes.map((c) => [String(c.id), c.nom]))}
               onValueChange={(v) => {
                 setClasseId((v as string) ?? '')
                 setMatiereId('toutes')
@@ -256,6 +263,9 @@ export function SaisieNotes({
             <Label htmlFor="n-matiere">Matière</Label>
             <Select
               value={matiereId}
+              items={Object.fromEntries(
+                matieresDisponibles.map((m) => [String(m.id), m.nom])
+              )}
               onValueChange={(v) => {
                 setMatiereId((v as string) ?? 'toutes')
                 setEvaluationId('')

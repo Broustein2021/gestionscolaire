@@ -174,6 +174,7 @@ export function ClasseDialog({
               {niveauxCycle.length > 0 ? (
                 <Select
                   value={niveauSel}
+                  items={Object.fromEntries(niveauxCycle.map((n) => [String(n.id), n.code]))}
                   onValueChange={(v) => setNiveauSel(v ?? AUTRE)}
                   disabled={desactive}
                 >
@@ -226,6 +227,12 @@ export function ClasseDialog({
               <Label htmlFor="cl-prof">Professeur principal</Label>
               <Select
                 value={headTeacherId}
+                items={Object.fromEntries(
+                  (options?.enseignants ?? []).map((t) => [
+                    String(t.id),
+                    `${t.prenoms} ${t.nom}`.trim(),
+                  ])
+                )}
                 onValueChange={(v) => setHeadTeacherId(v ?? AUCUN)}
                 disabled={desactive}
               >

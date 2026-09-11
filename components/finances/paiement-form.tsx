@@ -153,6 +153,7 @@ export function PaiementForm({
             <Label htmlFor="paiement-eleve">Élève</Label>
             <Select
               value={eleveId}
+              items={libellesEleves}
               onValueChange={(v) => setEleveId(v as string)}
             >
               <SelectTrigger id="paiement-eleve" className="w-full">
@@ -202,6 +203,12 @@ export function PaiementForm({
               <Label htmlFor="paiement-categorie">Catégorie de frais</Label>
               <Select
                 value={categorieId}
+                items={Object.fromEntries(
+                  options.categories.map((c) => [
+                    String(c.id),
+                    `${c.nom} — ${formatFCFA(c.montant)}`,
+                  ])
+                )}
                 onValueChange={(v) => setCategorieId(v as string)}
               >
                 <SelectTrigger id="paiement-categorie" className="w-full">

@@ -156,6 +156,7 @@ export function EleveEditDialog({
               <Label htmlFor="el-sexe">Sexe</Label>
               <Select
                 value={sexe}
+                items={{ M: 'Masculin', F: 'Féminin' }}
                 onValueChange={(v) => setSexe(v as 'M' | 'F')}
                 disabled={desactive}
               >
@@ -220,6 +221,7 @@ export function EleveEditDialog({
               <Label htmlFor="el-statut">Statut</Label>
               <Select
                 value={statut}
+                items={statutLibelle}
                 onValueChange={(v) => setStatut(v as (typeof STATUTS)[number])}
                 disabled={desactive}
               >
